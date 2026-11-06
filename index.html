@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Merise Studio</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header id="top"><b class="logo">◆ Merise Studio</b><input id="nomProjet" aria-label="Nom du projet">
+ <div class="btns"><button data-a="undo" title="Annuler">↶</button><button data-a="redo" title="Rétablir">↷</button>
+ <button data-a="zm" title="Zoom -">−</button><button data-a="zp" title="Zoom +">+</button><button data-a="fit" title="Ajuster">⤢</button>
+ <button data-a="save" title="Enregistrer">💾</button><button data-a="menu" title="Projets et export">☰</button></div></header>
+<nav id="onglets"></nav><div id="outils"></div>
+<main><svg id="toile" xmlns="http://www.w3.org/2000/svg"></svg>
+<section id="panneau"><button class="poignee" data-a="pan">Propriétés ▲</button><div class="corps"></div></section></main>
+<div id="menu" hidden><div class="carte"><button class="fermer" data-m="fermer">✕</button><div class="corps"></div></div></div>
+<input type="file" id="fichier" accept=".json" hidden>
+<script src="modele.js"></script><script src="rendu.js"></script><script src="stockage.js"></script><script src="interactions.js"></script>
+</body></html>
