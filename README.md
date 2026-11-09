@@ -30,11 +30,11 @@ Sur une base déjà installée, l’ancien compte administrateur préconfiguré 
 
 Sécurité : les nouveaux mots de passe doivent contenir au moins 12 caractères (72 octets maximum). Utilisez un mot de passe unique, configurez un compte MySQL dédié avec un mot de passe non vide en production, et mettez le site en HTTPS.
 
-## Hébergement gratuit PHP/MySQL (InfinityFree)
-1. Créez vous-même un compte gratuit et un sous-domaine sur [InfinityFree](https://dash.infinityfree.com/register). GitHub Pages n'exécute pas PHP.
+## Hébergement gratuit PHP/MySQL (AwardSpace)
+1. Créez vous-même un compte gratuit sur [AwardSpace](https://www.awardspace.com/free-web-hosting-registration/) et choisissez un sous-domaine gratuit. GitHub Pages n'exécute pas PHP.
 2. Dans le panneau de contrôle de l'hébergeur, créez une base MySQL et notez son hôte, son nom, son utilisateur et son mot de passe. Ces valeurs sont fournies par l'hébergeur : elles ne sont généralement pas `localhost` / `root`.
 3. Copiez `api/config.local.example.php` vers `api/config.local.php`, remplacez les valeurs par celles de votre panneau, puis envoyez le fichier `config.local.php` au serveur. Il est ignoré par Git et protégé contre l'accès Web. Ne le publiez jamais sur GitHub et ne partagez pas son contenu.
-4. Envoyez le contenu du projet directement dans le dossier Web (`htdocs` ou équivalent), sans envoyer `.git` ni le dossier parent. Conservez les fichiers et sous-dossiers (`api`, `css`, `db`, `js`).
-5. Activez le certificat SSL gratuit dans le panneau et ouvrez le site avec `https://`. Avant de partager l'adresse, créez le premier compte administrateur et vérifiez une inscription, une connexion et l'enregistrement d'un diagramme.
+4. Envoyez le contenu du projet directement dans le dossier Web (par exemple `www` ou équivalent), sans envoyer `.git` ni le dossier parent. Conservez les fichiers et sous-dossiers (`api`, `css`, `db`, `js`).
+5. **Avant d'ouvrir l'inscription**, vérifiez que le sous-domaine gratuit dispose bien de HTTPS actif sur l'offre gratuite. Les mots de passe ne doivent pas transiter en HTTP. Ensuite, créez le premier compte administrateur et vérifiez une inscription, une connexion et l'enregistrement d'un diagramme.
 
 L'API crée les tables dans la base que vous avez créée. Si la connexion échoue, vérifiez les quatre valeurs de `api/config.local.php` dans le panneau de l'hébergeur. Un hébergement gratuit partagé convient aux essais et démonstrations, mais ne garantit ni disponibilité ni sauvegardes : n'y stockez pas de données sensibles sans avoir vérifié les conditions et protections de l'hébergeur.
