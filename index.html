@@ -1,16 +1,47 @@
 <!DOCTYPE html>
-<html lang="fr"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Merise Studio</title><link rel="stylesheet" href="style.css"></head>
-<body>
-<header id="top"><b class="logo">◆ Merise Studio</b><input id="nomProjet" aria-label="Nom du projet">
- <div class="btns"><button data-a="undo" title="Annuler">↶</button><button data-a="redo" title="Rétablir">↷</button>
- <button data-a="zm" title="Zoom -">−</button><button data-a="zp" title="Zoom +">+</button><button data-a="fit" title="Ajuster">⤢</button>
- <button data-a="save" title="Enregistrer">💾</button><button data-a="menu" title="Projets et export">☰</button></div></header>
-<nav id="onglets"></nav><div id="outils"></div>
-<main><svg id="toile" xmlns="http://www.w3.org/2000/svg"></svg>
-<section id="panneau"><button class="poignee" data-a="pan">Propriétés ▲</button><div class="corps"></div></section></main>
-<div id="menu" hidden><div class="carte"><button class="fermer" data-m="fermer">✕</button><div class="corps"></div></div></div>
-<input type="file" id="fichier" accept=".json" hidden>
-<script src="modele.js"></script><script src="rendu.js"></script><script src="stockage.js"></script><script src="interactions.js"></script>
-</body></html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Merise Studio : éditeur gratuit de diagrammes MCD, MLD, MCC, MCT et MOT. Enregistrez, exportez en PNG ou PDF, générez du SQL.">
+<meta name="theme-color" content="#0f6b3a">
+<title>Merise Studio — diagrammes MERISE en ligne</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="index.html">
+<main id="contenu" class="page">
+  <section class="hero">
+    <p class="eyebrow">Éditeur MERISE · sans installation</p>
+    <h1>Concevez vos modèles de données et de traitements, du MCD jusqu’au SQL.</h1>
+    <p class="lead">Merise Studio rassemble l’éditeur, le compte, l’export et les outils d’étude (dictionnaire, exemples, génération SQL) dans un seul site.</p>
+    <p class="cta">
+      <a class="btn primaire" href="editeur.html">Ouvrir l’éditeur</a>
+      <a class="btn" href="aide.html">Lire le guide</a>
+    </p>
+  </section>
+  <section class="bloc">
+    <h2>Ce que contient le site</h2>
+    <div class="cartes">
+      <article><h3>Éditeur</h3><p>MCD, MLD, MCC, MCT, MOT et dessin libre. Glisser, relier, styliser, annuler, corbeille.</p></article>
+      <article><h3>Compte & Administration</h3><p>Inscription, connexion (compte <code>root</code> préconfiguré), <a href="admin.html">espace administrateur</a> dédié, gestion des utilisateurs et messages.</p></article>
+      <article><h3>Export</h3><p>PNG, PDF (impression), fichier <code>.merise.json</code> et brouillon automatique dans le navigateur.</p></article>
+      <article><h3>Outils Merise</h3><p>Cardinalités, dictionnaire de données, génération SQL, exemples prêts à ouvrir.</p></article>
+      <article><h3>Aide et contact</h3><p>Guide d’utilisation, raccourcis, pages légales et formulaire de contact.</p></article>
+      <article><h3>Accessibilité</h3><p>Thème clair/sombre, navigation clavier, pages adaptées au téléphone.</p></article>
+    </div>
+  </section>
+  <section class="bloc">
+    <h2>Comment commencer</h2>
+    <ol class="etapes">
+      <li>Ouvrez l’éditeur et choisissez un type de diagramme (MCD pour commencer).</li>
+      <li>Ajoutez des éléments depuis la palette, reliez-les, renseignez les attributs.</li>
+      <li>Créez un compte pour enregistrer, exporter, et retrouver vos projets.</li>
+    </ol>
+    <p class="cta"><a class="btn primaire" href="editeur.html">Aller à l’éditeur</a></p>
+  </section>
+</main>
+<script src="js/site.js"></script>
+</body>
+</html>

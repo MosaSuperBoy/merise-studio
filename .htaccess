@@ -1,0 +1,4 @@
+Options -Indexes
+DirectoryIndex index.html index.php
+AddDefaultCharset UTF-8
+ErrorDocument 404 /merise-studio/404.html

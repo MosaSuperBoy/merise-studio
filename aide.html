@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Guide d’utilisation de Merise Studio : diagrammes, liaisons, export, compte et raccourcis.">
+<meta name="theme-color" content="#0f6b3a">
+<title>Aide — Merise Studio</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="aide.html">
+<main id="contenu" class="page texte">
+  <h1>Guide d’utilisation</h1>
+  <p class="lead">Merise Studio sert à dessiner les modèles MERISE, les enregistrer et les exporter. Voici le parcours complet.</p>
+
+  <h2>Types de diagrammes</h2>
+  <ul>
+    <li><strong>MCD</strong> — entités et associations (modèle conceptuel de données).</li>
+    <li><strong>MLD</strong> — tables (modèle logique, proche du SQL).</li>
+    <li><strong>MCC</strong> — acteurs et messages (communication).</li>
+    <li><strong>MCT</strong> — événements, opérations, synchronisations (traitements).</li>
+    <li><strong>MOT</strong> — postes et opérations (organisation).</li>
+    <li><strong>Dessin libre</strong> — rectangles, ovales, losanges, texte.</li>
+  </ul>
+
+  <h2>Construire un diagramme</h2>
+  <ol>
+    <li>Cliquez sur un bouton de la palette <em>Ajouter</em>.</li>
+    <li>Glissez l’élément. Touchez-le pour changer son nom et ses attributs (un par ligne).</li>
+    <li>Activez <strong>Sélection multiple</strong>, touchez deux éléments, puis <strong>Relier</strong>.</li>
+    <li>Sur un lien, indiquez la cardinalité (0,1 · 0,N · 1,1 · 1,N) dans le panneau de droite.</li>
+  </ol>
+
+  <h2>Outils de l’éditeur</h2>
+  <ul>
+    <li><strong>Style et typographie</strong> — police, taille, couleurs, gras, italique, <u>texte souligné</u> (Ctrl+U), alignement (gauche/centre/droite).</li>
+    <li><strong>Zone de texte et dimensions</strong> — réglage précis de la largeur et hauteur (curseurs ou ajustement auto), fond transparent ou coloré.</li>
+    <li><strong>Traits et bordures</strong> — épaisseur réglable (0 à 12 px), styles continu, pointillés, tirets ou tiret-point, coins arrondis.</li>
+    <li><strong>Flèches et liaisons</strong> — direction (fin, début, deux bouts, aucune), forme (triangle plein, ouverte en V, losange plein/vide, rond) et taille ajustable.</li>
+    <li><strong>Annuler / Rétablir</strong> — Ctrl+Z / Ctrl+Y.</li>
+    <li><strong>Dupliquer, copier, coller</strong> — Ctrl+D, Ctrl+C, Ctrl+V.</li>
+    <li><strong>Aligner</strong> — aligne plusieurs éléments sélectionnés.</li>
+    <li><strong>Zoom et grille</strong> — barre au-dessus du canevas ; les déplacements s’accrochent à la grille.</li>
+    <li><strong>Générer SQL</strong> — propose un script à partir des entités/tables et de leurs attributs.</li>
+    <li><strong>Dictionnaire</strong> — liste les objets et attributs du diagramme.</li>
+    <li><strong>Exemples</strong> — charge un modèle déjà construit pour s’entraîner.</li>
+    <li><strong>PNG, PDF, SVG</strong> — export visuel (compte requis).</li>
+  </ul>
+
+  <h2>Compte et Administration</h2>
+  <p>Sans connexion, vous pouvez dessiner : le navigateur garde un brouillon. Pour <strong>Enregistrer, Ouvrir, PNG, PDF, SVG et Nouveau</strong>, un compte est demandé.</p>
+  <p>Un espace administrateur dédié permet de gérer la plateforme, les comptes utilisateurs et les diagrammes.</p>
+  <p><strong>Espace Administrateur (<a href="admin.html">admin.html</a>)</strong> : tableau de bord, gestion complète des utilisateurs, supervision des diagrammes, messages de contact reçus, journal d’audit et personnalisation du mot de passe root.</p>
+
+  <h2>Raccourcis</h2>
+  <table class="table">
+    <thead><tr><th>Touches</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>Ctrl+S</td><td>Enregistrer</td></tr>
+      <tr><td>Ctrl+Z / Ctrl+Y</td><td>Annuler / Rétablir</td></tr>
+      <tr><td>Ctrl+A</td><td>Tout sélectionner</td></tr>
+      <tr><td>Ctrl+C / Ctrl+V / Ctrl+D</td><td>Copier / Coller / Dupliquer</td></tr>
+      <tr><td>Ctrl+U</td><td>Souligner le texte sélectionné (ou préfixez un attribut par <code>#</code>)</td></tr>
+      <tr><td>Ctrl+B / Ctrl+I</td><td>Gras / Italique</td></tr>
+      <tr><td>Suppr</td><td>Supprimer la sélection</td></tr>
+      <tr><td>Maj+clic</td><td>Ajouter à la sélection</td></tr>
+    </tbody>
+  </table>
+  <p class="cta"><a class="btn primaire" href="editeur.html">Ouvrir l’éditeur</a></p>
+</main>
+<script src="js/site.js"></script>
+</body>
+</html>

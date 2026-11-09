@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Contacter l’équipe de Merise Studio.">
+<meta name="theme-color" content="#0f6b3a">
+<title>Contact — Merise Studio</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="contact.html">
+<main id="contenu" class="page texte">
+  <h1>Contact</h1>
+  <p class="lead">Une question, un bug, une suggestion d’outil ? Envoyez un message. L’administrateur le retrouve dans son espace Compte.</p>
+  <form id="fContact" class="form-bloc">
+    <label>Nom<input name="nom" required maxlength="100" autocomplete="name"></label>
+    <label>E-mail<input name="email" type="email" required maxlength="190" autocomplete="email"></label>
+    <label>Sujet<input name="sujet" required maxlength="150"></label>
+    <label>Message<textarea name="message" required minlength="10" maxlength="4000" rows="6"></textarea></label>
+    <p id="contactErr" class="erreur" hidden></p>
+    <p id="contactOk" class="ok" hidden>Message envoyé. Merci.</p>
+    <button class="primaire" type="submit">Envoyer</button>
+  </form>
+  <p class="aide">Le serveur PHP et MySQL doivent tourner pour que le formulaire fonctionne. Sinon, ouvrez <a href="aide.html">l’aide</a> pour l’installation.</p>
+</main>
+<script src="js/site.js"></script>
+</body>
+</html>

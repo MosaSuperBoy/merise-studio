@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Espace Administrateur de Merise Studio : gestion des utilisateurs, diagrammes, messages et journal d’activité.">
+<meta name="theme-color" content="#0f6b3a">
+<title>Espace Administrateur — Merise Studio</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body data-page="admin.html">
+<div id="adminApp">
+  <!-- Rendu dynamique par js/admin.js -->
+  <noscript>
+    <div style="max-width:500px;margin:3rem auto;padding:1.5rem;background:#fff;border-radius:12px;text-align:center;">
+      <h2>JavaScript requis</h2>
+      <p>L’espace administrateur nécessite JavaScript pour fonctionner.</p>
+    </div>
+  </noscript>
+</div>
+
+<div id="toast" role="status"></div>
+<dialog id="dlgAdmin" class="dlg-admin"></dialog>
+
+<script src="js/admin.js"></script>
+</body>
+</html>

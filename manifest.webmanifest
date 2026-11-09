@@ -1,0 +1,12 @@
+{
+  "name": "Merise Studio",
+  "short_name": "Merise",
+  "lang": "fr",
+  "start_url": "editeur.html",
+  "display": "standalone",
+  "background_color": "#eaf8ef",
+  "theme_color": "#0f6b3a",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Éditeur Merise Studio : MCD, MLD, MCC, MCT, MOT, export PNG/PDF et génération SQL.">
+<meta name="theme-color" content="#0f6b3a">
+<title>Éditeur — Merise Studio</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="app">
+<a class="skip" href="#toile">Aller au diagramme</a>
+<header class="barre">
+  <a class="marque-app" href="index.html">Merise Studio</a>
+  <input id="titre" aria-label="Titre du diagramme" value="Sans titre">
+  <select id="type" aria-label="Type de diagramme"></select>
+  <nav class="actions">
+    <button id="bEnregistrer" class="primaire">Enregistrer</button>
+    <button id="bOuvrir">Ouvrir</button>
+    <button id="bPng">PNG</button>
+    <button id="bPdf">PDF</button>
+    <button id="bSvg">SVG</button>
+    <button id="bNouveau">Nouveau</button>
+    <button id="bAide">Aide</button>
+    <button id="bTheme">Thème</button>
+    <button id="bCompte">Compte</button>
+  </nav>
+  <input type="file" id="fichier" accept=".json,application/json,.merise.json" hidden>
+</header>
+<main>
+  <aside class="carte" id="palette"><h2>Ajouter</h2><div id="boutonsPalette"></div></aside>
+  <section class="carte zone">
+    <div class="zoom-barre" role="toolbar" aria-label="Zoom et grille">
+      <button type="button" id="bZoomMoins" title="Dézoomer">−</button>
+      <button type="button" id="bZoomReset" title="Zoom 100%">100 %</button>
+      <button type="button" id="bZoomPlus" title="Zoomer">+</button>
+      <button type="button" id="bGrille">Grille</button>
+      <button type="button" id="bAjuster">Ajuster</button>
+    </div>
+    <svg id="toile" viewBox="0 0 2000 1400" width="2000" height="1400"></svg>
+  </section>
+  <aside class="carte" id="proprietes">
+    <h2>Outils</h2>
+    <div class="outils">
+      <button id="bAnnuler">Annuler</button>
+      <button id="bRefaire">Rétablir</button>
+      <button id="bMulti">Sélection multiple</button>
+      <button id="bRelier">Relier</button>
+      <button id="bDupliquer">Dupliquer</button>
+      <button id="bCopier">Copier</button>
+      <button id="bColler">Coller</button>
+      <button id="bSuppr" class="danger">Supprimer…</button>
+    </div>
+    <h2>Disposition</h2>
+    <div class="outils">
+      <button id="bAlG" title="Aligner à gauche">Gauche</button>
+      <button id="bAlC" title="Centrer horizontalement">Centre</button>
+      <button id="bAlD" title="Aligner à droite">Droite</button>
+      <button id="bAlH" title="Aligner en haut">Haut</button>
+      <button id="bAlM" title="Centrer verticalement">Milieu</button>
+      <button id="bAlB" title="Aligner en bas">Bas</button>
+    </div>
+    <h2>Merise</h2>
+    <div class="outils">
+      <button id="bSql">Générer SQL</button>
+      <button id="bDico">Dictionnaire</button>
+      <button id="bExemples">Exemples</button>
+      <button id="bRaccourcis">Raccourcis</button>
+    </div>
+    <div id="champs"></div>
+  </aside>
+</main>
+<div id="toast" role="status"></div>
+<dialog id="dlg"></dialog>
+<script src="js/editeur.js"></script>
+<script src="js/compte.js"></script>
+</body>
+</html>
