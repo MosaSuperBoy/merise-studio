@@ -1,8 +1,8 @@
 Options -Indexes
 DirectoryIndex index.html index.php
 AddDefaultCharset UTF-8
-ErrorDocument 404 /merise-studio/404.html
+ErrorDocument 404 /404.html
 
-<FilesMatch "(^config\.php$|\.sql$)">
+<FilesMatch "^(config[^/]*\.php|.*\.sql)$">
   Require all denied
 </FilesMatch>
