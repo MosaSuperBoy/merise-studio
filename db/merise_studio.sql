@@ -57,6 +57,19 @@ CREATE TABLE IF NOT EXISTS sessions (
   INDEX idx_sess_expire (expire_le)
 ) ENGINE=InnoDB;
 
+-- Désactive les installations qui utilisent encore le mot de passe administrateur publié.
+UPDATE utilisateurs
+SET actif = 0
+WHERE LOWER(nom) = 'root'
+  AND LOWER(email) = 'root@merise.local'
+  AND mot_de_passe = '$2y$12$39eevJ5B5Mdbg.cZT1zEaOvtR72aD..rHRdU4kbehbZBVEQZ9icVS';
+
+DELETE s FROM sessions s
+JOIN utilisateurs u ON u.id = s.utilisateur_id
+WHERE LOWER(u.nom) = 'root'
+  AND LOWER(u.email) = 'root@merise.local'
+  AND u.mot_de_passe = '$2y$12$39eevJ5B5Mdbg.cZT1zEaOvtR72aD..rHRdU4kbehbZBVEQZ9icVS';
+
 -- ------------------------------------------------------------
 -- Journal des actions (suppressions, restaurations, connexions…)
 -- ------------------------------------------------------------
@@ -82,12 +95,3 @@ CREATE TABLE IF NOT EXISTS messages (
   lu         TINYINT(1)    NOT NULL DEFAULT 0,
   cree_le    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
-
--- ------------------------------------------------------------
--- Compte administrateur par défaut
--- Nom de connexion : root
--- Mot de passe initial : Admi@123 (modifiable depuis l'espace administrateur)
--- ------------------------------------------------------------
-INSERT INTO utilisateurs (nom, email, mot_de_passe, role, actif)
-VALUES ('root', 'root@merise.local', '$2y$12$39eevJ5B5Mdbg.cZT1zEaOvtR72aD..rHRdU4kbehbZBVEQZ9icVS', 'admin', 1)
-ON DUPLICATE KEY UPDATE role = 'admin';

@@ -7,6 +7,13 @@ header('Content-Type: application/json; charset=utf-8');
 set_exception_handler(function ($e) { http_response_code(500); echo json_encode(['erreur' => 'Erreur serveur'], JSON_UNESCAPED_UNICODE); });
 function rep($d, $c = 200) { http_response_code($c); echo json_encode($d, JSON_UNESCAPED_UNICODE); exit; }
 function err($m, $c = 400) { rep(['erreur' => $m], $c); }
+function motDePasseValide($motDePasse) {
+  if (!is_string($motDePasse) || strlen($motDePasse) > 72) return false;
+  return preg_match_all('/./us', $motDePasse, $caracteres) !== false && count($caracteres[0]) >= 12;
+}
+function hacherMotDePasse($motDePasse) {
+  return password_hash($motDePasse, PASSWORD_BCRYPT, ['cost' => 12]);
+}
 
 // --- Base de données intégrée : créée automatiquement au premier lancement ---
 function connexion($avecBase) {
@@ -38,14 +45,10 @@ try {
     cree_le DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB");
 
-  // Initialisation ou vérification du compte administrateur root (mot de passe initial : Admi@123 modifiable)
-  $chkRoot = $bd->prepare("SELECT id FROM utilisateurs WHERE LOWER(nom) = 'root' OR LOWER(email) = 'root@merise.local'");
-  $chkRoot->execute();
-  if (!$chkRoot->fetch()) {
-    $hashRoot = '$2y$12$39eevJ5B5Mdbg.cZT1zEaOvtR72aD..rHRdU4kbehbZBVEQZ9icVS';
-    $insRoot = $bd->prepare("INSERT INTO utilisateurs (nom, email, mot_de_passe, role, actif) VALUES ('root', 'root@merise.local', ?, 'admin', 1)");
-    $insRoot->execute([$hashRoot]);
-  }
+  // Désactive les installations qui utilisent encore le mot de passe administrateur publié.
+  $hashRootParDefaut = '$2y$12$39eevJ5B5Mdbg.cZT1zEaOvtR72aD..rHRdU4kbehbZBVEQZ9icVS';
+  $desactiverRoot = $bd->prepare("UPDATE utilisateurs SET actif=0 WHERE LOWER(nom)='root' AND LOWER(email)='root@merise.local' AND mot_de_passe=?");
+  $desactiverRoot->execute([$hashRootParDefaut]);
 } catch (Throwable $e) {
   err('Base de données inaccessible. Vérifiez api/config.php, ou créez une base vide nommée « ' . DB_NOM . ' » : les tables se créeront toutes seules.', 500);
 }
@@ -71,24 +74,29 @@ function connecte($bd) {
 // --- Actions publiques ---
 if ($action === 'register') {
   $nom = trim($in['nom'] ?? ''); $email = strtolower(trim($in['email'] ?? '')); $mdp = $in['mot_de_passe'] ?? '';
-  if ($nom === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($mdp) < 6) err('Nom, e-mail valide et mot de passe (6 caractères min.) requis');
+  if ($nom === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || !motDePasseValide($mdp)) err('Nom, e-mail valide et mot de passe (12 caractères min., 72 octets max.) requis');
   if (strtolower($nom) === 'root') err('Le nom de connexion « root » est réservé à l\'administrateur', 400);
   $s = $bd->prepare('SELECT id FROM utilisateurs WHERE email=? OR LOWER(nom)=?'); $s->execute([$email, strtolower($nom)]);
   if ($s->fetch()) err('Cet e-mail ou nom d\'utilisateur est déjà utilisé', 409);
   // Si aucun admin n'existe encore, ce compte devient admin
-  $role = $bd->query("SELECT COUNT(*) c FROM utilisateurs WHERE role='admin'")->fetch()['c'] == 0 ? 'admin' : 'utilisateur';
-  $bd->prepare('INSERT INTO utilisateurs(nom,email,mot_de_passe,role) VALUES(?,?,?,?)')->execute([$nom, $email, password_hash($mdp, PASSWORD_DEFAULT), $role]);
+  $role = $bd->query("SELECT COUNT(*) c FROM utilisateurs WHERE role='admin' AND actif=1")->fetch()['c'] == 0 ? 'admin' : 'utilisateur';
+  $bd->prepare('INSERT INTO utilisateurs(nom,email,mot_de_passe,role) VALUES(?,?,?,?)')->execute([$nom, $email, hacherMotDePasse($mdp), $role]);
   $id = (int)$bd->lastInsertId(); journal($bd, $id, 'inscription');
   rep(['jeton' => ouvrirSession($bd, $id), 'utilisateur' => ['id' => $id, 'nom' => $nom, 'email' => $email, 'role' => $role]]);
 }
 if ($action === 'login') {
   $login = trim($in['identifiant'] ?? $in['email'] ?? $in['nom'] ?? '');
   if ($login === '') err('Identifiant ou e-mail requis', 400);
+  $mdp = $in['mot_de_passe'] ?? '';
+  if (!is_string($mdp) || strlen($mdp) > 72) err('Identifiant ou mot de passe incorrect', 401);
   $s = $bd->prepare('SELECT * FROM utilisateurs WHERE LOWER(email)=? OR LOWER(nom)=? LIMIT 1');
   $s->execute([strtolower($login), strtolower($login)]);
   $u = $s->fetch();
-  if (!$u || !password_verify($in['mot_de_passe'] ?? '', $u['mot_de_passe'])) err('Identifiant ou mot de passe incorrect', 401);
+  if (!$u || !password_verify($mdp, $u['mot_de_passe'])) err('Identifiant ou mot de passe incorrect', 401);
   if (!$u['actif']) err('Compte désactivé', 403);
+  if (password_needs_rehash($u['mot_de_passe'], PASSWORD_BCRYPT, ['cost' => 12])) {
+    $bd->prepare('UPDATE utilisateurs SET mot_de_passe=? WHERE id=?')->execute([hacherMotDePasse($mdp), $u['id']]);
+  }
   $bd->prepare('UPDATE utilisateurs SET derniere_connexion=NOW() WHERE id=?')->execute([$u['id']]);
   journal($bd, $u['id'], 'connexion');
   rep(['jeton' => ouvrirSession($bd, $u['id']), 'utilisateur' => pub($u)]);
@@ -159,8 +167,9 @@ switch ($action) {
   case 'mot_de_passe':
     if (!password_verify($in['actuel'] ?? '', $u['mot_de_passe'])) err('Mot de passe actuel incorrect', 401);
     $nouveau = $in['nouveau'] ?? '';
-    if (strlen($nouveau) < 6) err('Le nouveau mot de passe doit faire 6 caractères min.');
-    $bd->prepare('UPDATE utilisateurs SET mot_de_passe=? WHERE id=?')->execute([password_hash($nouveau, PASSWORD_DEFAULT), $uid]);
+    if (!motDePasseValide($nouveau)) err('Le nouveau mot de passe doit faire 12 caractères min. (72 octets max.)');
+    $bd->prepare('UPDATE utilisateurs SET mot_de_passe=? WHERE id=?')->execute([hacherMotDePasse($nouveau), $uid]);
+    $bd->prepare('DELETE FROM sessions WHERE utilisateur_id=? AND jeton<>?')->execute([$uid, $_SERVER['HTTP_X_TOKEN'] ?? '']);
     journal($bd, $uid, 'mot_de_passe');
     rep(['ok' => true]);
 }
@@ -210,14 +219,14 @@ switch ($action) {
     $email = strtolower(trim($in['email'] ?? ''));
     $mdp = $in['mot_de_passe'] ?? '';
     $role = ($in['role'] ?? '') === 'admin' ? 'admin' : 'utilisateur';
-    if ($nom === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($mdp) < 6) {
-      err('Nom, e-mail valide et mot de passe (6 caractères min.) requis');
+    if ($nom === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || !motDePasseValide($mdp)) {
+      err('Nom, e-mail valide et mot de passe (12 caractères min., 72 octets max.) requis');
     }
     $chk = $bd->prepare('SELECT id FROM utilisateurs WHERE email=? OR LOWER(nom)=?');
     $chk->execute([$email, strtolower($nom)]);
     if ($chk->fetch()) err('Cet e-mail ou nom d\'utilisateur existe déjà', 409);
     $bd->prepare('INSERT INTO utilisateurs (nom, email, mot_de_passe, role, actif) VALUES (?, ?, ?, ?, 1)')
-       ->execute([$nom, $email, password_hash($mdp, PASSWORD_DEFAULT), $role]);
+       ->execute([$nom, $email, hacherMotDePasse($mdp), $role]);
     $nouvelId = (int)$bd->lastInsertId();
     journal($bd, $uid, 'admin_ajout_utilisateur', "id=$nouvelId, nom=$nom, role=$role");
     rep(['ok' => true, 'id' => $nouvelId]);
@@ -234,9 +243,14 @@ switch ($action) {
     if ($chk->fetch()) err('Cet e-mail ou nom est déjà utilisé par un autre compte', 409);
     $mdp = $in['mot_de_passe'] ?? '';
     if ($mdp !== '') {
-      if (strlen($mdp) < 6) err('Le mot de passe doit contenir 6 caractères min.');
+      if (!motDePasseValide($mdp)) err('Le mot de passe doit faire 12 caractères min. (72 octets max.)');
       $bd->prepare('UPDATE utilisateurs SET nom=?, email=?, role=?, mot_de_passe=? WHERE id=?')
-         ->execute([$nom, $email, $role, password_hash($mdp, PASSWORD_DEFAULT), $idCible]);
+         ->execute([$nom, $email, $role, hacherMotDePasse($mdp), $idCible]);
+      if ($idCible === $uid) {
+        $bd->prepare('DELETE FROM sessions WHERE utilisateur_id=? AND jeton<>?')->execute([$idCible, $_SERVER['HTTP_X_TOKEN'] ?? '']);
+      } else {
+        $bd->prepare('DELETE FROM sessions WHERE utilisateur_id=?')->execute([$idCible]);
+      }
       journal($bd, $uid, 'admin_modif_mdp_user', "id=$idCible");
     } else {
       $bd->prepare('UPDATE utilisateurs SET nom=?, email=?, role=? WHERE id=?')

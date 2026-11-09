@@ -24,7 +24,7 @@
     E.dlg('<h2>' + (ins ? 'Créer un compte' : 'Se connecter') + '</h2>' + (info ? '<p class="aide">' + esc(info) + '</p>' : '') + '<form id="fAuth"> ' +
       (ins ? '<input name="nom" placeholder="Nom" required autocomplete="name">' : '') +
       '<input name="email" type="' + (ins ? 'email' : 'text') + '" placeholder="' + (ins ? 'E-mail' : 'Identifiant ou e-mail') + '" required autocomplete="' + (ins ? 'email' : 'username') + '">' +
-      '<input name="mot_de_passe" type="password" placeholder="Mot de passe' + (ins ? ' (6 caractères min.)' : '') + '" ' + (ins ? 'minlength="6"' : '') + ' required autocomplete="' + (ins ? 'new-password' : 'current-password') + '">' +
+      '<input name="mot_de_passe" type="password" placeholder="Mot de passe' + (ins ? ' (12 caractères min.)' : '') + '" ' + (ins ? 'minlength="12" maxlength="72"' : '') + ' required autocomplete="' + (ins ? 'new-password' : 'current-password') + '">' +
       (erreur ? '<p class="erreur">' + esc(erreur) + '</p>' : '') +
       '<button class="primaire">' + (ins ? 'Créer mon compte' : 'Se connecter') + '</button>' +
       '<button type="button" data-a="bascule">' + (ins ? 'J\'ai déjà un compte' : 'Créer un compte') + '</button>' +
@@ -122,7 +122,7 @@
   function vueMdp() {
     E.dlg('<h2>Mot de passe</h2><form id="fMdp">' +
       '<input name="actuel" type="password" placeholder="Mot de passe actuel" required autocomplete="current-password">' +
-      '<input name="nouveau" type="password" placeholder="Nouveau (6 caractères min.)" minlength="6" required autocomplete="new-password">' +
+      '<input name="nouveau" type="password" placeholder="Nouveau (12 caractères min.)" minlength="12" maxlength="72" required autocomplete="new-password">' +
       '<button class="primaire">Changer</button><button type="button" data-a="retour">Retour</button></form>');
     var d = $('#dlg');
     d.onclick = function (e) { if (e.target.closest('[data-a=retour]')) vueCompte(); };

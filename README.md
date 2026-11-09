@@ -7,10 +7,10 @@ Site complet pour dessiner des diagrammes MERISE (MCD, MLD, MCC, MCT, MOT, dessi
 2. Modifiez `api/config.php` avec vos accès MySQL.
 3. **Rien à importer** : la base et les tables se créent automatiquement au premier lancement (schéma intégré dans `db/merise_studio.sql`). Si votre hébergeur interdit la création de bases, créez une base vide dans phpMyAdmin avec le nom indiqué dans `config.php` : les tables se créeront seules. Import manuel possible : `mysql -u root -p < db/merise_studio.sql`.
 4. Ouvrez `http://localhost/merise-studio/` (pas en double-cliquant sur les fichiers : PHP doit tourner pour le compte, l’enregistrement et le contact).
-5. Cliquez sur **Éditeur**, puis **Compte** (ou directement sur **Espace Administrateur** : `admin.html`).
-6. Un compte administrateur est déjà configuré par défaut :
-   - **Nom de connexion** : `root`
-   - **Mot de passe** : `Admi@123` *(modifiable à tout moment depuis l'espace administrateur)*
+5. Sur une nouvelle installation, créez votre compte avec **Compte** : le premier compte créé devient administrateur. Faites cette première inscription depuis votre machine locale ou protégez temporairement le site par un accès restreint avant de le rendre public.
+6. Connectez-vous ensuite à l’**Espace Administrateur** (`admin.html`) et utilisez un mot de passe unique d’au moins 12 caractères. Aucun compte ni mot de passe administrateur par défaut n’est créé.
+
+Sur une base déjà installée, l’ancien compte administrateur préconfiguré est automatiquement désactivé au prochain appel de l’API. S’il ne reste aucun administrateur actif, le prochain compte inscrit devient administrateur. Les mots de passe existants restent utilisables jusqu’à leur changement.
 
 ## Pages du site
 - Accueil (`index.html`), Éditeur (`editeur.html`), Espace Administrateur (`admin.html`), Aide (`aide.html`), À propos (`a-propos.html`), Contact (`contact.html`), Mentions légales (`mentions.html`), Confidentialité (`confidentialite.html`), Page 404 (`404.html`).
@@ -26,6 +26,6 @@ Site complet pour dessiner des diagrammes MERISE (MCD, MLD, MCC, MCT, MOT, dessi
 - **Enregistrer** : le projet est envoyé sur le serveur et un fichier `.merise.json` est téléchargé. Le navigateur garde un brouillon automatique.
 - **PNG / PDF / SVG** : export de l'image ; pour le PDF, choisissez « Enregistrer au format PDF » dans la boîte d'impression.
 - **Compte** : profil, mot de passe, diagrammes, corbeille.
-- **Espace Administrateur (`admin.html`)** : tableau de bord complet, métriques et KPIs, gestion des comptes utilisateurs (création, modification, activation/désactivation, suppression, réinitialisation de mot de passe), surveillance de tous les diagrammes, consultation et traitement des messages de contact, journal d'audit et modification directe du mot de passe root.
+- **Espace Administrateur (`admin.html`)** : tableau de bord complet, métriques et KPIs, gestion des comptes utilisateurs (création, modification, activation/désactivation, suppression, réinitialisation de mot de passe), surveillance de tous les diagrammes, consultation et traitement des messages de contact et journal d'audit.
 
-Sécurité : mettez le site en HTTPS en production.
+Sécurité : les nouveaux mots de passe doivent contenir au moins 12 caractères (72 octets maximum). Utilisez un mot de passe unique, configurez un compte MySQL dédié avec un mot de passe non vide en production, et mettez le site en HTTPS.

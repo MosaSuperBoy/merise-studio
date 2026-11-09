@@ -135,7 +135,7 @@
         '</div>' +
         '<div class="admin-actions-haut">' +
           '<span class="admin-user-info" title="Connecté en tant qu\'administrateur">👤 ' + esc(user.nom) + '</span>' +
-          '<button type="button" id="bMdpRapide" title="Changer le mot de passe root">🔑 Mot de passe</button>' +
+          '<button type="button" id="bMdpRapide" title="Changer le mot de passe administrateur">🔑 Mot de passe</button>' +
           '<a href="editeur.html" class="btn" style="background:#fff;color:var(--vert2);">🎨 Éditeur</a>' +
           '<a href="index.html" class="btn" style="background:#fff;color:var(--vert2);">🌐 Site</a>' +
           '<button type="button" id="bTheme">Thème</button>' +
@@ -143,17 +143,13 @@
         '</div>' +
       '</header>' +
       '<main class="admin-conteneur">' +
-        '<div class="callout-alerte" id="alerteMdp" style="display:none;">' +
-          '<div><strong>⚠️ Sécurité :</strong> Vous utilisez le compte root avec un mot de passe par défaut. Nous vous conseillons de le personnaliser.</div>' +
-          '<button type="button" class="primaire" id="bChangerMdpAlerte" style="white-space:nowrap;">Changer maintenant</button>' +
-        '</div>' +
         '<nav class="admin-onglets" role="tablist">' +
           '<button class="admin-onglet-btn actif" data-tab="stats">📊 Vue d\'ensemble</button>' +
           '<button class="admin-onglet-btn" data-tab="users">👥 Utilisateurs <span class="pillule" id="badgeNbUsers">0</span></button>' +
           '<button class="admin-onglet-btn" data-tab="diagrammes">📐 Diagrammes <span class="pillule" id="badgeNbDiags">0</span></button>' +
           '<button class="admin-onglet-btn" data-tab="messages">✉️ Messages <span class="pillule" id="badgeNbMsgs">0</span></button>' +
           '<button class="admin-onglet-btn" data-tab="journal">📜 Journal d\'activité</button>' +
-          '<button class="admin-onglet-btn" data-tab="moncompte">🔐 Mon compte root</button>' +
+          '<button class="admin-onglet-btn" data-tab="moncompte">🔐 Mon compte</button>' +
         '</nav>' +
         '<div id="contenuOnglet"></div>' +
       '</main>';
@@ -170,9 +166,6 @@
     };
 
     $('#bMdpRapide').onclick = vueChangerMonMdp;
-    var bAlerte = $('#bChangerMdpAlerte');
-    if (bAlerte) bAlerte.onclick = vueChangerMonMdp;
-
     // Gestion du clic sur les onglets
     var onglets = document.querySelectorAll('.admin-onglet-btn');
     onglets.forEach(function (btn) {
@@ -247,8 +240,8 @@
           '<div class="stat-details">' + (s.messages_non_lus > 0 ? '<b style="color:var(--orange2);">' + s.messages_non_lus + ' non lu' + (s.messages_non_lus > 1 ? 's' : '') + '</b>' : 'Tous les messages sont lus') + '</div>' +
         '</div>' +
         '<div class="stat-carte">' +
-          '<div class="stat-entete"><span>ESPACE ROOT</span><span>🔐</span></div>' +
-          '<div class="stat-valeur" style="font-size:1.4rem;padding-top:.4rem;">root (Actif)</div>' +
+          '<div class="stat-entete"><span>ESPACE ADMINISTRATEUR</span><span>🔐</span></div>' +
+          '<div class="stat-valeur" style="font-size:1.4rem;padding-top:.4rem;">' + esc(user.nom) + '</div>' +
           '<div class="stat-details"><button type="button" class="btn-mini primaire" id="bModifMdpRapide">Modifier mot de passe</button></div>' +
         '</div>' +
       '</div>' +
@@ -419,8 +412,8 @@
           '<label>Adresse e-mail' +
             '<input name="email" type="email" required placeholder="ex. dupont@exemple.ci">' +
           '</label>' +
-          '<label>Mot de passe (6 caractères min.)' +
-            '<input name="mot_de_passe" type="password" required minlength="6" placeholder="Mot de passe">' +
+          '<label>Mot de passe (12 caractères min.)' +
+            '<input name="mot_de_passe" type="password" required minlength="12" maxlength="72" placeholder="Mot de passe">' +
           '</label>' +
           '<label>Rôle' +
             '<select name="role">' +
@@ -472,7 +465,7 @@
             '<input name="email" type="email" required value="' + esc(cible.email) + '">' +
           '</label>' +
           '<label>Nouveau mot de passe (laisser vide pour ne pas changer)' +
-            '<input name="mot_de_passe" type="password" minlength="6" placeholder="Nouveau mot de passe (optionnel)">' +
+            '<input name="mot_de_passe" type="password" minlength="12" maxlength="72" placeholder="Nouveau mot de passe (optionnel)">' +
           '</label>' +
           '<label>Rôle' +
             '<select name="role"' + (moi ? ' disabled title="Impossible de modifier votre propre rôle"' : '') + '>' +
@@ -775,7 +768,7 @@
   }
 
   // ==========================================
-  // ONGLET 6 : MON COMPTE ROOT & MOT DE PASSE
+  // ONGLET 6 : MON COMPTE & MOT DE PASSE
   // ==========================================
   function afficherMonCompte(zone) {
     zone.innerHTML =
@@ -799,11 +792,11 @@
             '<label>Mot de passe actuel' +
               '<input name="actuel" type="password" required placeholder="Mot de passe actuel">' +
             '</label>' +
-            '<label>Nouveau mot de passe (6 caractères min.)' +
-              '<input name="nouveau" type="password" required minlength="6" placeholder="Nouveau mot de passe">' +
+            '<label>Nouveau mot de passe (12 caractères min.)' +
+              '<input name="nouveau" type="password" required minlength="12" maxlength="72" placeholder="Nouveau mot de passe">' +
             '</label>' +
             '<label>Confirmer le nouveau mot de passe' +
-              '<input name="confirme" type="password" required minlength="6" placeholder="Confirmer le nouveau mot de passe">' +
+              '<input name="confirme" type="password" required minlength="12" maxlength="72" placeholder="Confirmer le nouveau mot de passe">' +
             '</label>' +
             '<div id="errMdpProfil" class="erreur" style="display:none;margin-top:.4rem;"></div>' +
             '<button type="submit" class="primaire" style="margin-top:.5rem;">Changer mon mot de passe</button>' +
@@ -840,8 +833,6 @@
         await appel('mot_de_passe', { actuel: f.actuel, nouveau: f.nouveau });
         toast('Votre mot de passe a été modifié avec succès !');
         e.target.reset();
-        var alerte = $('#alerteMdp');
-        if (alerte) alerte.style.display = 'none';
       } catch (err) {
         errEl.textContent = err.message;
         errEl.style.display = 'block';
@@ -853,16 +844,16 @@
   function vueChangerMonMdp() {
     var d = ouvrirDlg(
       '<div class="dlg-admin">' +
-        '<h2>🔑 Changer mon mot de passe (root)</h2>' +
+        '<h2>🔑 Changer mon mot de passe administrateur</h2>' +
         '<form id="fMdpRapideDlg">' +
           '<label>Mot de passe actuel' +
             '<input name="actuel" type="password" required placeholder="Mot de passe actuel">' +
           '</label>' +
-          '<label>Nouveau mot de passe (6 car. min.)' +
-            '<input name="nouveau" type="password" required minlength="6" placeholder="Nouveau mot de passe">' +
+          '<label>Nouveau mot de passe (12 caractères min.)' +
+            '<input name="nouveau" type="password" required minlength="12" maxlength="72" placeholder="Nouveau mot de passe">' +
           '</label>' +
           '<label>Confirmation' +
-            '<input name="confirme" type="password" required minlength="6" placeholder="Confirmez le nouveau mot de passe">' +
+            '<input name="confirme" type="password" required minlength="12" maxlength="72" placeholder="Confirmez le nouveau mot de passe">' +
           '</label>' +
           '<div id="dlgErrMdp" class="erreur" style="display:none;"></div>' +
           '<div class="dlg-admin-actions">' +
