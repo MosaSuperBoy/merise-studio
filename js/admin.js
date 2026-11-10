@@ -134,6 +134,7 @@
       '<div class="auth-box">' +
         '<h1>' + (demande ? 'Mot de passe oublié' : 'Réinitialiser le mot de passe') + '</h1>' +
         (info ? '<p class="intro">' + esc(info) + '</p>' : '') +
+        (demande ? '<p class="intro">Utilisez l’adresse e-mail associée au compte administrateur, pas son identifiant de connexion. Si aucun code n’arrive, vérifiez les courriers indésirables et ajoutez une adresse MAIL_FROM_ADDRESS valide dans api/config.local.php.</p>' : '') +
         (erreur ? '<p class="erreur" style="background:#fde8e8;padding:.6rem .8rem;border-radius:8px;">' + esc(erreur) + '</p>' : '') +
         '<form id="fResetAdmin">' +
           '<label>Adresse e-mail du compte' +
@@ -235,7 +236,7 @@
       else if (nom === 'diagrammes') await afficherDiagrammes(zone);
       else if (nom === 'messages') await afficherMessages(zone);
       else if (nom === 'journal') await afficherJournal(zone);
-      else if (nom === 'moncompte') afficherMonCompte(zone);
+      else if (nom === 'moncompte') await afficherMonCompte(zone);
     } catch (err) {
       zone.innerHTML = '<p class="erreur">Erreur : ' + esc(err.message) + '</p>';
     }
@@ -814,7 +815,7 @@
   // ==========================================
   // ONGLET 6 : MON COMPTE & MOT DE PASSE
   // ==========================================
-  function afficherMonCompte(zone) {
+  async function afficherMonCompte(zone) {
     zone.innerHTML =
       '<div class="admin-profil-grille">' +
         '<div class="carte">' +
@@ -845,6 +846,12 @@
             '<div id="errMdpProfil" class="erreur" style="display:none;margin-top:.4rem;"></div>' +
             '<button type="submit" class="primaire" style="margin-top:.5rem;">Changer mon mot de passe</button>' +
           '</form>' +
+        '</div>' +
+        '<div class="carte">' +
+          '<h2>🛠️ Maintenance du site</h2>' +
+          '<p id="maintenanceEtat" class="aide">Chargement de l’état du site…</p>' +
+          '<p class="aide">En maintenance, les visiteurs ne peuvent plus utiliser le site. L’espace administrateur reste accessible.</p>' +
+          '<button type="button" id="bMaintenance" class="danger" disabled>Chargement…</button>' +
         '</div>' +
       '</div>';
 
@@ -880,6 +887,41 @@
       } catch (err) {
         errEl.textContent = err.message;
         errEl.style.display = 'block';
+      }
+    };
+
+    var maintenanceActif = null;
+    var etatMaintenance = $('#maintenanceEtat');
+    var boutonMaintenance = $('#bMaintenance');
+    function afficherEtatMaintenance() {
+      etatMaintenance.textContent = maintenanceActif ? 'La maintenance est activée.' : 'La maintenance est désactivée.';
+      boutonMaintenance.textContent = maintenanceActif ? 'Désactiver la maintenance' : 'Activer la maintenance';
+      boutonMaintenance.disabled = false;
+      boutonMaintenance.setAttribute('aria-pressed', maintenanceActif ? 'true' : 'false');
+    }
+    try {
+      var etat = await appel('maintenance_status');
+      maintenanceActif = !!etat.actif;
+      afficherEtatMaintenance();
+    } catch (err) {
+      etatMaintenance.textContent = 'Impossible de charger l’état : ' + err.message;
+      boutonMaintenance.textContent = 'Indisponible';
+    }
+    boutonMaintenance.onclick = async function () {
+      if (maintenanceActif === null) return;
+      var prochainEtat = !maintenanceActif;
+      if (!confirm(prochainEtat
+        ? 'Activer la maintenance ? Les visiteurs ne pourront plus utiliser le site.'
+        : 'Désactiver la maintenance et rouvrir le site aux visiteurs ?')) return;
+      boutonMaintenance.disabled = true;
+      try {
+        var resultat = await appel('maintenance_set', { actif: prochainEtat });
+        maintenanceActif = resultat.actif;
+        afficherEtatMaintenance();
+        toast(maintenanceActif ? 'Mode maintenance activé.' : 'Mode maintenance désactivé.');
+      } catch (err) {
+        etatMaintenance.textContent = 'Impossible de modifier l’état : ' + err.message;
+        boutonMaintenance.disabled = false;
       }
     };
   }

@@ -53,6 +53,12 @@ try {
     CONSTRAINT fk_reset_user FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs(id) ON DELETE CASCADE,
     INDEX idx_reset_expire (expire_le)
   ) ENGINE=InnoDB");
+  $bd->exec("CREATE TABLE IF NOT EXISTS site_settings (
+    setting_key VARCHAR(64) PRIMARY KEY,
+    setting_value VARCHAR(255) NOT NULL,
+    modifie_le DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB");
+  $bd->exec("INSERT IGNORE INTO site_settings(setting_key,setting_value) VALUES('maintenance','0')");
 
   // Désactive les installations qui utilisent encore le mot de passe administrateur publié.
   $hashRootParDefaut = '$2y$12$39eevJ5B5Mdbg.cZT1zEaOvtR72aD..rHRdU4kbehbZBVEQZ9icVS';
@@ -64,6 +70,7 @@ try {
 
 $in = json_decode(file_get_contents('php://input'), true) ?: [];
 $action = $_GET['action'] ?? '';
+$maintenanceActive = $bd->query("SELECT setting_value FROM site_settings WHERE setting_key='maintenance'")->fetchColumn() === '1';
 
 function journal($bd, $u, $a, $d = null) { $bd->prepare('INSERT INTO journal(utilisateur_id,action,details) VALUES(?,?,?)')->execute([$u, $a, $d]); }
 function pub($u) { return ['id' => (int)$u['id'], 'nom' => $u['nom'], 'email' => $u['email'], 'role' => $u['role']]; }
@@ -81,7 +88,9 @@ function connecte($bd) {
 }
 
 // --- Actions publiques ---
+if ($action === 'maintenance_status') rep(['actif' => $maintenanceActive]);
 if ($action === 'register') {
+  if ($maintenanceActive) err('Le site est en maintenance. Réessayez plus tard.', 503);
   $nom = trim($in['nom'] ?? ''); $email = strtolower(trim($in['email'] ?? '')); $mdp = $in['mot_de_passe'] ?? '';
   if ($nom === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || !motDePasseValide($mdp)) err('Nom, e-mail valide et mot de passe (12 caractères min., 72 octets max.) requis');
   if (strtolower($nom) === 'root') err('Le nom de connexion « root » est réservé à l\'administrateur', 400);
@@ -103,6 +112,7 @@ if ($action === 'login') {
   $u = $s->fetch();
   if (!$u || !password_verify($mdp, $u['mot_de_passe'])) err('Identifiant ou mot de passe incorrect', 401);
   if (!$u['actif']) err('Compte désactivé', 403);
+  if ($maintenanceActive && $u['role'] !== 'admin') err('Le site est en maintenance. Réessayez plus tard.', 503);
   if (password_needs_rehash($u['mot_de_passe'], PASSWORD_BCRYPT, ['cost' => 12])) {
     $bd->prepare('UPDATE utilisateurs SET mot_de_passe=? WHERE id=?')->execute([hacherMotDePasse($mdp), $u['id']]);
   }
@@ -111,9 +121,13 @@ if ($action === 'login') {
   rep(['jeton' => ouvrirSession($bd, $u['id']), 'utilisateur' => pub($u)]);
 }
 if ($action === 'password_reset_request') {
+  $expediteur = defined('MAIL_FROM_ADDRESS') ? MAIL_FROM_ADDRESS : '';
+  if (!filter_var($expediteur, FILTER_VALIDATE_EMAIL)) {
+    err('Envoi indisponible : ajoutez une adresse valide MAIL_FROM_ADDRESS dans api/config.local.php.', 503);
+  }
   $email = strtolower(trim($in['email'] ?? ''));
   if (!filter_var($email, FILTER_VALIDATE_EMAIL)) err('Adresse e-mail invalide');
-  $message = 'Si un compte actif correspond à cette adresse, un code de réinitialisation vient de lui être envoyé.';
+  $message = 'Si un compte actif correspond à cette adresse, un code a été demandé. S’il n’arrive pas, vérifiez les courriers indésirables et la configuration e-mail du serveur.';
   $s = $bd->prepare('SELECT id FROM utilisateurs WHERE LOWER(email)=? AND actif=1 LIMIT 1');
   $s->execute([$email]);
   $utilisateurId = $s->fetchColumn();
@@ -127,7 +141,6 @@ if ($action === 'password_reset_request') {
     $bd->prepare('REPLACE INTO password_reset_codes(utilisateur_id,code_hash,tentatives,expire_le,cree_le) VALUES(?,?,0,DATE_ADD(NOW(),INTERVAL 15 MINUTE),NOW())')
       ->execute([$utilisateurId, $hashCode]);
 
-    $expediteur = defined('MAIL_FROM_ADDRESS') ? MAIL_FROM_ADDRESS : 'no-reply@localhost';
     if (filter_var($expediteur, FILTER_VALIDATE_EMAIL)) {
       $sujet = '=?UTF-8?B?' . base64_encode('Code de réinitialisation — Merise Studio') . '?=';
       $texte = "Bonjour,\n\nVotre code de réinitialisation Merise Studio est : $code\n\nCe code expire dans 15 minutes et ne peut être utilisé qu'une seule fois. Si vous n'avez pas demandé cette réinitialisation, ignorez ce message.\n";
@@ -209,6 +222,7 @@ if ($action === 'password_reset_confirm') {
   rep(['ok' => true]);
 }
 if ($action === 'contact') {
+  if ($maintenanceActive) err('Le site est en maintenance. Réessayez plus tard.', 503);
   $nom = trim($in['nom'] ?? ''); $email = strtolower(trim($in['email'] ?? ''));
   $sujet = trim($in['sujet'] ?? ''); $msg = trim($in['message'] ?? '');
   if ($nom === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || $sujet === '' || strlen($msg) < 10) err('Tous les champs sont requis (message : 10 caractères min.)');
@@ -222,6 +236,7 @@ if ($action === 'contact') {
 
 // --- Actions réservées aux utilisateurs connectés ---
 $u = connecte($bd); $uid = (int)$u['id'];
+if ($maintenanceActive && $u['role'] !== 'admin') err('Le site est en maintenance. Réessayez plus tard.', 503);
 switch ($action) {
   case 'me': rep(['utilisateur' => pub($u)]);
   case 'logout': $bd->prepare('DELETE FROM sessions WHERE jeton=?')->execute([$_SERVER['HTTP_X_TOKEN']]); rep(['ok' => true]);
@@ -284,6 +299,13 @@ switch ($action) {
 // --- Administration ---
 if ($u['role'] !== 'admin') err('Accès réservé à l\'administrateur', 403);
 switch ($action) {
+  case 'maintenance_set':
+    if (!is_bool($in['actif'] ?? null)) err('État de maintenance invalide');
+    $valeur = $in['actif'] ? '1' : '0';
+    $bd->prepare("INSERT INTO site_settings(setting_key,setting_value) VALUES('maintenance',?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)")
+      ->execute([$valeur]);
+    journal($bd, $uid, 'maintenance_modifiee', $valeur);
+    rep(['ok' => true, 'actif' => $in['actif']]);
   case 'admin_stats':
     $uTot = (int)$bd->query('SELECT COUNT(*) FROM utilisateurs')->fetchColumn();
     $uAct = (int)$bd->query('SELECT COUNT(*) FROM utilisateurs WHERE actif=1')->fetchColumn();

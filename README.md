@@ -9,7 +9,7 @@ Site complet pour dessiner des diagrammes MERISE (MCD, MLD, MCC, MCT, MOT, dessi
 4. Ouvrez `http://localhost/merise-studio/` (pas en double-cliquant sur les fichiers : PHP doit tourner pour le compte, l’enregistrement et le contact).
 5. Sur une nouvelle installation, créez votre compte avec **Compte** : le premier compte créé devient administrateur. Faites cette première inscription depuis votre machine locale ou protégez temporairement le site par un accès restreint avant de le rendre public.
 6. Connectez-vous ensuite à l’**Espace Administrateur** (`admin.html`) et utilisez un mot de passe unique d’au moins 12 caractères. Aucun compte ni mot de passe administrateur par défaut n’est créé.
-7. Pour permettre la réinitialisation du mot de passe par e-mail, configurez l’envoi de courriels PHP sur le serveur et renseignez `MAIL_FROM_ADDRESS` dans `api/config.local.php` avec une adresse d’expédition valide. Le courriel contient le logo du site, le code à 6 chiffres expire après 15 minutes et est limité à 5 tentatives.
+7. Pour permettre la réinitialisation du mot de passe par e-mail, configurez l’envoi de courriels PHP sur le serveur et ajoutez à `api/config.local.php` une ligne `const MAIL_FROM_ADDRESS = 'no-reply@votre-domaine.tld';` avec une adresse d’expédition valide pour votre domaine. Si ce fichier existe déjà, ajoutez seulement cette ligne sans remplacer vos paramètres MySQL. Le courriel contient le logo du site, le code à 6 chiffres expire après 15 minutes et est limité à 5 tentatives.
 
 Sur une base déjà installée, l’ancien compte administrateur préconfiguré est automatiquement désactivé au prochain appel de l’API. S’il ne reste aucun administrateur actif, le prochain compte inscrit devient administrateur. Les mots de passe existants restent utilisables jusqu’à leur changement.
 
@@ -27,7 +27,7 @@ Sur une base déjà installée, l’ancien compte administrateur préconfiguré 
 - **Enregistrer** : le projet est envoyé sur le serveur et un fichier `.merise.json` est téléchargé. Le navigateur garde un brouillon automatique.
 - **PNG / PDF / SVG** : export de l'image ; pour le PDF, choisissez « Enregistrer au format PDF » dans la boîte d'impression.
 - **Compte** : profil, mot de passe, diagrammes, corbeille.
-- **Espace Administrateur (`admin.html`)** : tableau de bord complet, métriques et KPIs, gestion des comptes utilisateurs (création, modification, activation/désactivation, suppression, réinitialisation de mot de passe), surveillance de tous les diagrammes, consultation et traitement des messages de contact et journal d'audit.
+- **Espace Administrateur (`admin.html`)** : tableau de bord complet, métriques et KPIs, gestion des comptes utilisateurs (création, modification, activation/désactivation, suppression, réinitialisation de mot de passe), activation/désactivation du mode maintenance global depuis **Mon compte**, surveillance de tous les diagrammes, consultation et traitement des messages de contact et journal d'audit.
 
 Sécurité : les nouveaux mots de passe doivent contenir au moins 12 caractères (72 octets maximum). Utilisez un mot de passe unique, configurez un compte MySQL dédié avec un mot de passe non vide en production, et mettez le site en HTTPS.
 

@@ -106,6 +106,12 @@ a.btn.primaire,button.primaire{background:linear-gradient(135deg,var(--orange),v
 .pied-grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;max-width:960px;margin:0 auto}
 .site-pied a{display:block;color:#fff;text-decoration:none;opacity:.9;margin:.2rem 0}
 .site-pied .copy{text-align:center;opacity:.7;margin:1.2rem 0 0;font-size:.9rem}
+.maintenance-overlay{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:1.25rem;background:#0f241aee}
+.maintenance-card{width:min(100%,520px);padding:clamp(1.5rem,5vw,2.5rem);border-radius:20px;background:#fff;color:#14301f;text-align:center;box-shadow:0 16px 48px #0005}
+.maintenance-card h1{font-size:clamp(1.5rem,5vw,2rem);line-height:1.2}
+.maintenance-card p{line-height:1.6}
+.maintenance-label{color:var(--orange2);font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.maintenance-card .btn{margin-top:.5rem}
 .form-bloc{display:flex;flex-direction:column;gap:.7rem;max-width:440px}
 .ok{color:var(--vert2);font-weight:700}
 .table{width:100%;border-collapse:collapse}

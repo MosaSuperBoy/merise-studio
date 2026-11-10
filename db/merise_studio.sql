@@ -69,6 +69,15 @@ CREATE TABLE IF NOT EXISTS password_reset_codes (
   INDEX idx_reset_expire (expire_le)
 ) ENGINE=InnoDB;
 
+-- Paramètres globaux du site, dont le mode maintenance
+CREATE TABLE IF NOT EXISTS site_settings (
+  setting_key   VARCHAR(64) PRIMARY KEY,
+  setting_value VARCHAR(255) NOT NULL,
+  modifie_le    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+INSERT IGNORE INTO site_settings(setting_key,setting_value) VALUES('maintenance','0');
+
 -- Désactive les installations qui utilisent encore le mot de passe administrateur publié.
 UPDATE utilisateurs
 SET actif = 0
