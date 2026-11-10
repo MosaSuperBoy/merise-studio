@@ -16,7 +16,7 @@
 
   <h2>Types de diagrammes</h2>
   <ul>
-    <li><strong>MCD</strong> — entités et associations (modèle conceptuel de données).</li>
+    <li><strong>MCD</strong> — entités, associations, héritage et contraintes (X, T, XT, I, CIF), comme dans Looping.</li>
     <li><strong>MLD</strong> — tables (modèle logique, proche du SQL).</li>
     <li><strong>MCC</strong> — acteurs et messages (communication).</li>
     <li><strong>MCT</strong> — événements, opérations, synchronisations (traitements).</li>
@@ -34,7 +34,7 @@
 
   <h2>Outils de l’éditeur</h2>
   <ul>
-    <li><strong>Style et typographie</strong> — police, taille, couleurs, gras, italique, <u>texte souligné</u> (Ctrl+U), alignement (gauche/centre/droite).</li>
+    <li><strong>Style et typographie</strong> — police, taille, couleurs, gras, italique, alignement. Le <u>soulignement</u> (Ctrl+U) ne concerne que la ligne cliquée : le nom de l’entité, ou un seul attribut. Un identifiant préfixé par <code>#</code> est souligné seul.</li>
     <li><strong>Zone de texte et dimensions</strong> — réglage précis de la largeur et hauteur (curseurs ou ajustement auto), fond transparent ou coloré.</li>
     <li><strong>Traits et bordures</strong> — épaisseur réglable (0 à 12 px), styles continu, pointillés, tirets ou tiret-point, coins arrondis.</li>
     <li><strong>Flèches et liaisons</strong> — direction (fin, début, deux bouts, aucune), forme (triangle plein, ouverte en V, losange plein/vide, rond) et taille ajustable.</li>
@@ -42,7 +42,9 @@
     <li><strong>Dupliquer, copier, coller</strong> — Ctrl+D, Ctrl+C, Ctrl+V.</li>
     <li><strong>Aligner</strong> — aligne plusieurs éléments sélectionnés.</li>
     <li><strong>Zoom et grille</strong> — barre au-dessus du canevas ; les déplacements s’accrochent à la grille.</li>
-    <li><strong>Générer SQL</strong> — propose un script à partir des entités/tables et de leurs attributs.</li>
+    <li><strong>Propriétés d’attributs</strong> — cliquez une ligne dans une entité ou une table pour choisir son type, sa clé primaire et les contraintes <code>NOT NULL</code> / <code>UNIQUE</code>.</li>
+    <li><strong>Créer le MLD depuis le MCD</strong> — place les clés étrangères selon les cardinalités et crée des tables de jonction pour les associations plusieurs-à-plusieurs. Les contraintes et héritages non pris en charge sont signalés.</li>
+    <li><strong>Générer SQL</strong> — choisissez MySQL/MariaDB, PostgreSQL, SQLite ou SQL Server pour obtenir un script de création.</li>
     <li><strong>Dictionnaire</strong> — liste les objets et attributs du diagramme.</li>
     <li><strong>Exemples</strong> — charge un modèle déjà construit pour s’entraîner.</li>
     <li><strong>PNG, PDF, SVG</strong> — export visuel (compte requis).</li>
@@ -51,7 +53,7 @@
   <h2>Compte et Administration</h2>
   <p>Sans connexion, vous pouvez dessiner : le navigateur garde un brouillon. Pour <strong>Enregistrer, Ouvrir, PNG, PDF, SVG et Nouveau</strong>, un compte est demandé.</p>
   <p>Un espace administrateur dédié permet de gérer la plateforme, les comptes utilisateurs et les diagrammes.</p>
-  <p><strong>Espace Administrateur (<a href="admin.html">admin.html</a>)</strong> : tableau de bord, gestion complète des utilisateurs, supervision des diagrammes, messages de contact reçus et journal d’audit. Aucun mot de passe administrateur par défaut n’est fourni.</p>
+  <p><strong>Espace Administrateur (<a href="admin.html">admin.html</a>)</strong> : tableau de bord, gestion complète des utilisateurs, supervision des diagrammes, messages de contact reçus, journal d’audit et commande <strong>Maintenance</strong> (tableau de bord, en-tête orange et onglet). Aucun mot de passe administrateur par défaut n’est fourni.</p>
 
   <h2>Raccourcis</h2>
   <table class="table">
@@ -61,7 +63,7 @@
       <tr><td>Ctrl+Z / Ctrl+Y</td><td>Annuler / Rétablir</td></tr>
       <tr><td>Ctrl+A</td><td>Tout sélectionner</td></tr>
       <tr><td>Ctrl+C / Ctrl+V / Ctrl+D</td><td>Copier / Coller / Dupliquer</td></tr>
-      <tr><td>Ctrl+U</td><td>Souligner le texte sélectionné (ou préfixez un attribut par <code>#</code>)</td></tr>
+      <tr><td>Ctrl+U</td><td>Souligner seulement la ligne cliquée (nom ou attribut)</td></tr>
       <tr><td>Ctrl+B / Ctrl+I</td><td>Gras / Italique</td></tr>
       <tr><td>Suppr</td><td>Supprimer la sélection</td></tr>
       <tr><td>Maj+clic</td><td>Ajouter à la sélection</td></tr>

@@ -7,6 +7,8 @@
   var KINDS = {
     entite: ['Entité', 'rect', '#e8f7ee', '#1f9d55', 170, 60],
     association: ['Association', 'ellipse', '#fff1e0', '#f28c1b', 150, 70],
+    heritage: ['Héritage', 'triangle', '#ffffff', '#157a40', 120, 78],
+    contrainte: ['Contrainte', 'ellipse', '#ffffff', '#d96a00', 64, 64],
     table: ['Table', 'rect', '#e8f7ee', '#1f9d55', 180, 60],
     acteur: ['Acteur', 'rect', '#e8f7ee', '#1f9d55', 150, 56],
     message: ['Message', 'ellipse', '#fff1e0', '#f28c1b', 140, 64],
@@ -21,7 +23,7 @@
     texte: ['Zone de texte', 'text', 'none', 'none', 140, 40]
   };
   var TYPES = {
-    MCD: ['entite', 'association'], MLD: ['table'], MCC: ['acteur', 'message', 'fleche'],
+    MCD: ['entite', 'association', 'heritage', 'contrainte'], MLD: ['table'], MCC: ['acteur', 'message', 'fleche'],
     MCT: ['evenement', 'operation', 'synchro'], MOT: ['poste', 'operation'],
     LIBRE: ['forme', 'ovale', 'losange', 'fleche', 'texte']
   };
@@ -31,13 +33,20 @@
   var $ = function (s) { return document.querySelector(s); };
   var svg = $('#toile'), dlg = $('#dlg');
   var doc, sel = new Set(), multi = false, undo = [], redo = [], drag = null, pend = null;
+  var ligneSel = null;
   var zoom = 1, grille = true, presse = null;
   if (localStorage.getItem('ms_theme') === 'sombre') document.documentElement.classList.add('sombre');
 
   /* ---------- Données et historique ---------- */
   function nouveau(type) { return { titre: 'Sans titre', type: type || 'MCD', seq: 0, nodes: [], links: [], trash: [], serveurId: null }; }
-  function snap() { return JSON.stringify({ nodes: doc.nodes, links: doc.links, trash: doc.trash }); }
-  function appliquer(s) { var o = JSON.parse(s); doc.nodes = o.nodes; doc.links = o.links; doc.trash = o.trash; sel.clear(); }
+  function snap() { return JSON.stringify({ nodes: doc.nodes, links: doc.links, trash: doc.trash, type: doc.type, titre: doc.titre }); }
+  function appliquer(s) {
+    var o = JSON.parse(s);
+    doc.nodes = o.nodes; doc.links = o.links; doc.trash = o.trash;
+    if (o.type) { doc.type = o.type; $('#type').value = o.type; palette(); }
+    if (o.titre !== undefined) { doc.titre = o.titre; $('#titre').value = o.titre; }
+    sel.clear();
+  }
   function avant() { undo.push(snap()); if (undo.length > 100) undo.shift(); redo = []; }
   function annuler() { if (!undo.length) return; redo.push(snap()); appliquer(undo.pop()); maj(); }
   function refaire() { if (!redo.length) return; undo.push(snap()); appliquer(redo.pop()); maj(); }
@@ -102,9 +111,9 @@
 
     if (y.w) w = Math.max(30, y.w);
     else {
-      if (f === 'rect' || f === 'round') {
+      if (f === 'rect' || f === 'round' || (f === 'ellipse' && n.kind === 'association')) {
         if (l.length) h = Math.max(h, (44 + l.length * 18) * r);
-        var m = Math.max.apply(null, [n.label.length * 9 * r].concat(l.map(function (x) { return x.length * 7.5 * r; }))) + 28;
+        var m = Math.max.apply(null, [visLen(n.label) * 9 * r].concat(l.map(function (x) { return visLen(x) * 7.5 * r; }))) + 28;
         w = Math.max(w, m);
       } else if (f === 'text') {
         var toutes = [n.label].concat(l).join('\n').split('\n');
@@ -137,6 +146,48 @@
   }
   var POLICE = { 'font-family': 'Trebuchet MS,Arial,sans-serif', fill: '#14301f', 'text-anchor': 'middle' };
   function texte(at, parent, t) { return el('text', Object.assign({}, POLICE, at), parent, t); }
+  function visLen(brut) {
+    var t = brut == null ? '' : String(brut);
+    if (t.charAt(0) === '#') t = t.slice(1);
+    else if (t.charAt(0) === '_' && t.charAt(t.length - 1) === '_' && t.length > 2) t = t.slice(1, -1);
+    return t.length;
+  }
+  function texteVisible(brut) {
+    var t = brut == null ? '' : String(brut);
+    if (t.charAt(0) === '#') return t.slice(1);
+    if (t.charAt(0) === '_' && t.charAt(t.length - 1) === '_' && t.length > 2) return t.slice(1, -1);
+    return t;
+  }
+  function estIdentifiant(brut) {
+    var t = brut == null ? '' : String(brut);
+    return t.charAt(0) === '#' || (t.charAt(0) === '_' && t.charAt(t.length - 1) === '_' && t.length > 2);
+  }
+  function ligneEstSoulignee(n, idx, brut) {
+    var marks = n.style && n.style.lignesU;
+    if (marks && Object.prototype.hasOwnProperty.call(marks, String(idx))) return !!marks[String(idx)];
+    if (idx < 0) return !!(n.style && n.style.u);
+    return estIdentifiant(brut);
+  }
+  function poserTexte(g, n, idx, brut, at) {
+    var visible = texteVisible(brut);
+    var node = texte(Object.assign({ 'data-ligne': String(idx), 'class': 'ligne-texte' }, at), g, visible || ' ');
+    var bb = node.getBBox();
+    if (ligneSel && n && ligneSel.id === n.id && ligneSel.idx === idx) {
+      var hi = el('rect', {
+        x: bb.x - 3, y: bb.y - 1, width: Math.max(8, bb.width + 6), height: bb.height + 3,
+        fill: '#f28c1b33', rx: 3, 'pointer-events': 'none'
+      });
+      g.insertBefore(hi, node);
+    }
+    if (n && ligneEstSoulignee(n, idx, brut) && visible) {
+      el('line', {
+        x1: bb.x, y1: bb.y + bb.height + 1.5, x2: bb.x + bb.width, y2: bb.y + bb.height + 1.5,
+        stroke: at.fill || '#14301f', 'stroke-width': Math.max(1.15, (parseFloat(at['font-size']) || 14) / 12),
+        'pointer-events': 'none', 'class': 'soulignement', 'data-ligne': String(idx)
+      }, g);
+    }
+    return node;
+  }
 
   function dashAttr(v) {
     if (!v || v === 'none' || v === 'continu') return null;
@@ -209,11 +260,14 @@
           'stroke-width': 4,
           'paint-order': 'stroke'
         };
+        var nodeLien = texte(txLien, g, l.label);
         if (st.u) {
-          txLien['text-decoration'] = 'underline';
-          txLien['style'] = 'text-decoration: underline;';
+          var bbL = nodeLien.getBBox();
+          el('line', {
+            x1: bbL.x, y1: bbL.y + bbL.height + 1.5, x2: bbL.x + bbL.width, y2: bbL.y + bbL.height + 1.5,
+            stroke: st.tc, 'stroke-width': Math.max(1.15, st.fs / 12), 'pointer-events': 'none', 'class': 'soulignement'
+          }, g);
         }
-        texte(txLien, g, l.label);
       }
     });
     doc.nodes.forEach(function (n) {
@@ -234,6 +288,8 @@
         el('ellipse', Object.assign({ cx: w / 2, cy: h / 2, rx: w / 2, ry: h / 2 }, st), g);
       } else if (f === 'diamond') {
         el('polygon', Object.assign({ points: [w / 2, 0, w, h / 2, w / 2, h, 0, h / 2].join(' ') }, st), g);
+      } else if (f === 'triangle') {
+        el('polygon', Object.assign({ points: [w / 2, 2, w - 2, h - 2, 2, h - 2].join(' ') }, st), g);
       } else if (f === 'arrow') {
         el('polygon', Object.assign({
           points: [0, h * 0.25, w * 0.65, h * 0.25, w * 0.65, 0, w, h * 0.5, w * 0.65, h, w * 0.65, h * 0.75, 0, h * 0.75].join(' ')
@@ -252,10 +308,6 @@
         'font-weight': y.b ? 'bold' : 'normal',
         'font-style': y.i ? 'italic' : 'normal'
       };
-      if (y.u) {
-        tx['text-decoration'] = 'underline';
-        tx['style'] = 'text-decoration: underline;';
-      }
 
       if (f === 'text') {
         var morceaux = [n.label].concat(l).join('\n').split('\n');
@@ -268,41 +320,34 @@
         else if (y.align === 'right') { posX = w - 12; anchor = 'end'; }
 
         morceaux.forEach(function (ln, idx) {
-          var estId = ln.indexOf('#') === 0 || (ln.indexOf('_') === 0 && ln.lastIndexOf('_') === ln.length - 1 && ln.length > 2);
-          var lnTx = Object.assign({}, tx, {
+          poserTexte(g, n, idx === 0 ? -1 : idx - 1, ln, Object.assign({}, tx, {
             x: posX,
             y: startY + idx * interligne,
             'font-size': y.fs,
-            'text-anchor': anchor
-          });
-          if (estId || y.u) {
-            lnTx['text-decoration'] = 'underline';
-            lnTx['style'] = 'text-decoration: underline;';
-          }
-          texte(lnTx, g, ln);
+            'text-anchor': anchor,
+            'font-weight': estIdentifiant(ln) ? 'bold' : tx['font-weight']
+          }));
         });
-      } else if (l.length && (f === 'rect' || f === 'round')) {
+      } else if (l.length && (f === 'rect' || f === 'round' || (f === 'ellipse' && n.kind === 'association'))) {
         var titleX = w / 2;
         var titleAnchor = 'middle';
         if (y.align === 'left') { titleX = 14; titleAnchor = 'start'; }
         else if (y.align === 'right') { titleX = w - 14; titleAnchor = 'end'; }
 
-        texte(Object.assign({ x: titleX, y: 24 * r, 'font-size': y.fs, 'text-anchor': titleAnchor }, tx), g, n.label);
-        el('line', { x1: 0, y1: 34 * r, x2: w, y2: 34 * r, stroke: y.sw > 0 ? y.stroke : '#1f9d55', 'stroke-width': Math.max(1, y.sw) }, g);
+        poserTexte(g, n, -1, n.label, Object.assign({ x: titleX, y: 24 * r, 'font-size': y.fs, 'text-anchor': titleAnchor }, tx));
+        el('line', {
+          x1: f === 'ellipse' ? w * 0.22 : 0, y1: 34 * r,
+          x2: f === 'ellipse' ? w * 0.78 : w, y2: 34 * r,
+          stroke: y.sw > 0 ? y.stroke : '#1f9d55', 'stroke-width': Math.max(1, y.sw)
+        }, g);
         l.forEach(function (x, i) {
-          var estId = x.indexOf('#') === 0 || (x.indexOf('_') === 0 && x.lastIndexOf('_') === x.length - 1 && x.length > 2);
-          var attrTx = Object.assign({}, tx, {
+          poserTexte(g, n, i, x, Object.assign({}, tx, {
             x: 12,
             y: (56 + i * 18) * r,
             'font-size': 13 * r,
             'text-anchor': 'start',
-            'font-weight': estId ? 'bold' : 'normal'
-          });
-          if (estId || y.u) {
-            attrTx['text-decoration'] = 'underline';
-            attrTx['style'] = 'text-decoration: underline;';
-          }
-          texte(attrTx, g, x);
+            'font-weight': estIdentifiant(x) ? 'bold' : 'normal'
+          }));
         });
       } else {
         var posX = w / 2;
@@ -311,7 +356,7 @@
         else if (y.align === 'right') { posX = w - 14; anchor = 'end'; }
         if (f === 'arrow') posX = w * 0.42;
 
-        texte(Object.assign({ x: posX, y: h / 2 + y.fs / 3, 'font-size': y.fs, 'text-anchor': anchor }, tx), g, n.label);
+        poserTexte(g, n, -1, n.label, Object.assign({ x: posX, y: h / 2 + y.fs / 3, 'font-size': y.fs, 'text-anchor': anchor }, tx));
       }
     });
   }
@@ -320,7 +365,10 @@
   function ajouter(kind) {
     avant();
     var i = doc.nodes.length, id = 'n' + (++doc.seq);
-    doc.nodes.push({ id: id, kind: kind, x: 60 + (i * 40) % 500, y: 60 + (i * 40) % 350, label: KINDS[kind][0], details: '' });
+    var libelle = KINDS[kind][0];
+    if (kind === 'contrainte') libelle = 'X';
+    doc.nodes.push({ id: id, kind: kind, x: 60 + (i * 40) % 500, y: 60 + (i * 40) % 350, label: libelle, details: '' });
+    ligneSel = { id: id, idx: -1 };
     sel.clear(); sel.add(id); maj();
   }
   function relier() {
@@ -333,7 +381,13 @@
     var n = idsN(); if (!n.length) return;
     avant(); var map = {};
     n.forEach(function (id) { var o = noeud(id), c = JSON.parse(JSON.stringify(o)); c.id = 'n' + (++doc.seq); c.x += 30; c.y += 30; map[id] = c.id; doc.nodes.push(c); });
-    doc.links.slice().forEach(function (l) { if (map[l.from] && map[l.to]) doc.links.push({ id: 'l' + (++doc.seq), from: map[l.from], to: map[l.to], label: l.label }); });
+    doc.links.slice().forEach(function (l) {
+      if (!map[l.from] || !map[l.to]) return;
+      var c = JSON.parse(JSON.stringify(l));
+      c.id = 'l' + (++doc.seq); c.from = map[l.from]; c.to = map[l.to];
+      if (c.foreignKey && map[c.foreignKey.table]) c.foreignKey.table = map[c.foreignKey.table];
+      doc.links.push(c);
+    });
     sel.clear(); Object.keys(map).forEach(function (k) { sel.add(map[k]); }); maj();
   }
 
@@ -346,7 +400,7 @@
     doc.trash.push({ nodes: nn, links: ln, date: new Date().toISOString() });
     doc.nodes = doc.nodes.filter(function (n) { return nIds.indexOf(n.id) < 0; });
     doc.links = doc.links.filter(function (l) { return ln.indexOf(l) < 0; });
-    sel.clear(); maj(); toast(nn.length + ' élément(s) et ' + ln.length + ' lien(s) supprimés. Annuler est possible.');
+    sel.clear(); ligneSel = null; maj(); toast(nn.length + ' élément(s) et ' + ln.length + ' lien(s) supprimés. Annuler est possible.');
   }
   function dlgSuppr() {
     var ns = idsN(), ls = idsL(), liensDe = doc.links.filter(function (l) { return ns.indexOf(l.from) >= 0 || ns.indexOf(l.to) >= 0; });
@@ -390,8 +444,45 @@
   }
   function cSelect(id, lab, options, v) {
     return '<label class="ligneS"><span>' + lab + '</span><select id="' + id + '">' + options.map(function (o) {
-      return '<option value="' + o[0] + '"' + (String(o[0]) === String(v) ? ' selected' : '') + '>' + o[1] + '</option>';
+      return '<option value="' + echapperHtml(o[0]) + '"' + (String(o[0]) === String(v) ? ' selected' : '') + '>' + echapperHtml(o[1]) + '</option>';
     }).join('') + '</select></label>';
+  }
+  function echapperHtml(v) {
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  var TYPES_SQL = ['INTEGER', 'BIGINT', 'SMALLINT', 'TINYINT', 'VARCHAR(255)', 'VARCHAR(100)', 'CHAR(10)',
+    'TEXT', 'BOOLEAN', 'DATE', 'DATETIME', 'TIMESTAMP', 'TIME', 'DECIMAL(10,2)', 'FLOAT', 'DOUBLE'];
+  function typeSqlValide(type) {
+    return /^(TINYINT|SMALLINT|INT|INTEGER|BIGINT|DECIMAL|NUMERIC|FLOAT|REAL|DOUBLE|CHAR|VARCHAR|NCHAR|NVARCHAR|TEXT|BOOLEAN|BOOL|BIT|DATE|DATETIME|TIMESTAMP|TIME|SERIAL|BIGSERIAL)(\(\s*\d+(\s*,\s*\d+)?\s*\))?(\s+UNSIGNED)?$/i.test(String(type || '').trim());
+  }
+  function lireAttribut(brut) {
+    var source = String(brut || '').trim();
+    var primary = source.charAt(0) === '#' || /\b(?:PK|PRIMARY KEY)\b/i.test(source);
+    source = source.replace(/^#/, '').replace(/\b(?:PK|PRIMARY KEY)\b/gi, '');
+    var unique = /\bUNIQUE\b/i.test(source);
+    source = source.replace(/\bUNIQUE\b/gi, '');
+    var notNull = /\bNOT\s+NULL\b/i.test(source);
+    source = source.replace(/\bNOT\s+NULL\b/gi, '').trim();
+    var match = source.match(/^(.+?)\s+([A-Za-z][A-Za-z0-9_]*(?:\s*\([^)]*\))?(?:\s+UNSIGNED)?)$/);
+    var nom = match ? match[1].trim() : source;
+    var type = match ? match[2].trim().toUpperCase() : (primary ? 'INTEGER' : 'VARCHAR(255)');
+    return { nom: nom, type: type, primary: primary, notNull: notNull || primary, unique: unique };
+  }
+  function formaterAttribut(a) {
+    return (a.primary ? '#' : '') + a.nom.trim() + ' ' + a.type.trim() +
+      (a.notNull || a.primary ? ' NOT NULL' : '') + (a.unique ? ' UNIQUE' : '');
+  }
+  function enregistrerAttribut(n, idx, a) {
+    if (!a.nom.trim()) { toast('Le nom de l’attribut est requis.'); return; }
+    if (!typeSqlValide(a.type)) { toast('Type SQL invalide. Choisissez un type pris en charge.'); return; }
+    var lignesAttributs = lignes(n);
+    if (idx < 0 || idx >= lignesAttributs.length) return;
+    avant();
+    lignesAttributs[idx] = formaterAttribut(a);
+    n.details = lignesAttributs.join('\n');
+    maj();
   }
 
   // Applique une modification au style de chaque élément / lien sélectionné
@@ -423,11 +514,13 @@
     $('#bMulti').classList.toggle('actif', multi);
     var n1 = ns.length ? noeud(ns[0]) : null, l1 = ls.length ? lien(ls[0]) : null;
     var f1 = n1 ? (KINDS[n1.kind] || [])[1] : '';
-    var hasDetails = n1 && (f1 === 'rect' || f1 === 'round' || f1 === 'text');
+    var hasDetails = n1 && (f1 === 'rect' || f1 === 'round' || f1 === 'text' || n1.kind === 'association');
 
     if (ns.length === 1 && !ls.length) {
       h += '<label>Nom / Libellé<input id="fLabel"></label>' +
-        (hasDetails ? '<label>Attributs / Contenu (un par ligne)<textarea id="fDet"></textarea></label><p class="aide">Astuce Merise : préfixez un attribut avec <code>#</code> pour le souligner automatiquement comme identifiant/clé primaire (ex. <code>#id_client</code>).</p>' : '');
+        (hasDetails ? '<label>Attributs / Contenu (un par ligne)<textarea id="fDet"></textarea></label><p class="aide">Préfixez un identifiant avec <code>#</code> (ex. <code>#id_client</code>) : seule cette ligne est soulignée. Cliquez ensuite le nom ou une ligne, puis Souligné, pour ne changer que cette ligne.</p>' : '') +
+        (n1.kind === 'contrainte' ? '<p class="aide">Contrainte (comme dans Looping)</p><div class="cardin" id="bContr">' +
+          ['X', 'T', 'XT', 'I', '+', 'CIF'].map(function (c) { return '<button type="button" data-k="' + c + '">' + c + '</button>'; }).join('') + '</div>' : '');
     } else if (ls.length === 1 && !ns.length) {
       h += '<label>Texte du lien (ex. 0,N)<input id="fLien"></label><p class="aide">Cardinalités</p><div class="cardin" id="bCardin">' +
         ['0,1', '0,N', '1,1', '1,N'].map(function (card) { return '<button type="button" data-c="' + card + '">' + card + '</button>'; }).join('') + '</div>';
@@ -439,6 +532,10 @@
 
     if (n1) {
       var y = sn(n1);
+      var idxU = (ligneSel && ligneSel.id === n1.id) ? ligneSel.idx : -1;
+      var brutU = idxU < 0 ? n1.label : (lignes(n1)[idxU] || '');
+      var uCible = ligneEstSoulignee(n1, idxU, brutU);
+      var cibleU = idxU < 0 ? 'le nom « ' + texteVisible(n1.label) + ' »' : 'la ligne « ' + texteVisible(brutU) + ' »';
       h += '<h3>Texte & Typographie' + (ns.length > 1 ? ' (' + ns.length + ')' : '') + '</h3>' +
         cF('sFont', 'Police', y.font) +
         cR('sFs', 'Taille du texte', y.fs, 10, 36, 'px') +
@@ -446,8 +543,9 @@
         '<div class="groupe-boutons">' +
           '<button type="button" id="bToggleB" class="btn-b' + (y.b ? ' actif' : '') + '" title="Gras (Ctrl+B)">Gras</button>' +
           '<button type="button" id="bToggleI" class="btn-i' + (y.i ? ' actif' : '') + '" title="Italique (Ctrl+I)">Italique</button>' +
-          '<button type="button" id="bToggleU" class="btn-u' + (y.u ? ' actif' : '') + '" title="Souligné (Ctrl+U)"><u>Souligné</u></button>' +
+          '<button type="button" id="bToggleU" class="btn-u' + (uCible ? ' actif' : '') + '" title="Souligner seulement la ligne cliquée (Ctrl+U)"><u>Souligné</u></button>' +
         '</div>' +
+        '<p class="aide">Cible du soulignement : ' + cibleU + '.</p>' +
         '<div class="ligneS" style="display:flex;align-items:center;justify-content:space-between;gap:.6rem;font-size:.9rem;margin-top:.3rem;">' +
           '<span>Alignement</span>' +
           '<div class="groupe-boutons" style="margin:0;flex:1;max-width:180px;">' +
@@ -456,6 +554,18 @@
             '<button type="button" id="bAlignR" class="' + (y.align === 'right' ? 'actif' : '') + '">Droite</button>' +
           '</div>' +
         '</div>';
+
+      if (ns.length === 1 && hasDetails && ligneSel && ligneSel.id === n1.id && ligneSel.idx >= 0) {
+        var attr = lireAttribut(lignes(n1)[ligneSel.idx] || '');
+        var optionsTypes = TYPES_SQL.map(function (type) { return [type, type]; });
+        if (optionsTypes.every(function (o) { return o[0] !== attr.type; })) optionsTypes.unshift([attr.type, attr.type]);
+        h += '<h3>Propriétés de l’attribut</h3>' +
+          '<label>Nom de l’attribut<input id="sAttrNom" value="' + echapperHtml(attr.nom) + '"></label>' +
+          cSelect('sAttrType', 'Type de données', optionsTypes, attr.type) +
+          cK('sAttrNotNull', 'NOT NULL', attr.notNull || attr.primary) +
+          cK('sAttrUnique', 'UNIQUE', attr.unique) +
+          cK('sAttrPrimary', 'Clé primaire', attr.primary);
+      }
 
       h += '<h3>Zone & Dimensions</h3>' +
         cR('sW', 'Largeur', y.w || Math.round(taille(n1)[0]), 40, 600, 'px') +
@@ -536,9 +646,32 @@
     if (ns.length === 1 && !ls.length) {
       $('#fLabel').value = n1.label;
       lie('#fLabel', function (v) { n1.label = v || ' '; });
+      var contr = $('#bContr');
+      if (contr) contr.onclick = function (e) {
+        var b = e.target.closest('[data-k]'); if (!b) return;
+        if (pend === null) pend = snap();
+        n1.label = b.getAttribute('data-k');
+        $('#fLabel').value = n1.label;
+        sauverLocal(); dessiner();
+      };
       if (hasDetails) {
         $('#fDet').value = n1.details || '';
         lie('#fDet', function (v) { n1.details = v; });
+      }
+      if (hasDetails && ligneSel && ligneSel.id === n1.id && ligneSel.idx >= 0) {
+        function sauverProprietesAttribut() {
+          var pk = $('#sAttrPrimary').checked;
+          enregistrerAttribut(n1, ligneSel.idx, {
+            nom: $('#sAttrNom').value,
+            type: $('#sAttrType').value,
+            primary: pk,
+            notNull: pk || $('#sAttrNotNull').checked,
+            unique: $('#sAttrUnique').checked
+          });
+        }
+        ['#sAttrNom', '#sAttrType', '#sAttrNotNull', '#sAttrUnique', '#sAttrPrimary'].forEach(function (id) {
+          $(id).addEventListener('change', sauverProprietesAttribut);
+        });
       }
     }
 
@@ -584,12 +717,7 @@
         maj();
       };
       var bU = $('#bToggleU');
-      if (bU) bU.onclick = function () {
-        avant();
-        var nv = !sn(n1).u;
-        appN(function (s) { s.u = nv; });
-        maj();
-      };
+      if (bU) bU.onclick = function () { basculerSoulignement(); };
 
       // Alignements
       ['L', 'C', 'R'].forEach(function (code) {
@@ -690,14 +818,55 @@
     }
   }
 
+  function basculerSoulignement() {
+    if (!idsN().length && !idsL().length) return;
+    avant();
+    if (ligneSel && sel.has(ligneSel.id) && ligneSel.id.charAt(0) === 'n') {
+      var n = noeud(ligneSel.id);
+      if (n) {
+        n.style = n.style || {};
+        n.style.lignesU = Object.assign({}, n.style.lignesU);
+        var brut = ligneSel.idx < 0 ? n.label : (lignes(n)[ligneSel.idx] || '');
+        var nvLigne = !ligneEstSoulignee(n, ligneSel.idx, brut);
+        n.style.lignesU[String(ligneSel.idx)] = nvLigne;
+        if (ligneSel.idx < 0) n.style.u = nvLigne;
+        maj();
+        toast(nvLigne ? 'Cette ligne est soulignée.' : 'Soulignement retiré de cette ligne.');
+        return;
+      }
+    }
+    if (idsN().length) {
+      var n0 = noeud(idsN()[0]);
+      var nvNom = !ligneEstSoulignee(n0, -1, n0.label);
+      idsN().forEach(function (i) {
+        var n = noeud(i);
+        n.style = n.style || {};
+        n.style.lignesU = Object.assign({}, n.style.lignesU);
+        n.style.lignesU['-1'] = nvNom;
+        n.style.u = nvNom;
+      });
+      maj();
+      toast(nvNom ? 'Nom souligné. Les autres lignes restent inchangées.' : 'Soulignement du nom retiré.');
+      return;
+    }
+    var nvLien = !sl(lien(idsL()[0])).u;
+    idsL().forEach(function (i) { var l = lien(i); l.style = l.style || {}; l.style.u = nvLien; });
+    maj();
+    toast(nvLien ? 'Texte du lien souligné.' : 'Soulignement retiré.');
+  }
+
   /* ---------- Interactions souris / tactile ---------- */
   function pos(e) { var p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); }
   svg.addEventListener('pointerdown', function (e) {
     var c = e.target.closest('[data-id]'), m = multi || e.shiftKey || e.ctrlKey;
-    if (!c) { if (!m) { sel.clear(); dessiner(); panneau(); } return; }
+    if (!c) { if (!m) { sel.clear(); ligneSel = null; dessiner(); panneau(); } return; }
     var id = c.getAttribute('data-id');
+    var ligneEl = e.target.closest('[data-ligne]');
     if (m) { if (sel.has(id)) sel.delete(id); else sel.add(id); }
     else if (!sel.has(id)) { sel.clear(); sel.add(id); }
+    if (id.charAt(0) === 'n') {
+      ligneSel = { id: id, idx: ligneEl ? parseInt(ligneEl.getAttribute('data-ligne'), 10) : -1 };
+    } else ligneSel = null;
     if (id[0] === 'n' && !m) { var p = pos(e); drag = { x: p.x, y: p.y, avant: snap(), bouge: false }; try { svg.setPointerCapture(e.pointerId); } catch (x) {} }
     dessiner(); panneau();
   });
@@ -732,23 +901,7 @@
     else if (cmd && k === 'c') { e.preventDefault(); copier(); }
     else if (cmd && k === 'v') { e.preventDefault(); coller(); }
     else if (cmd && k === 'd') { e.preventDefault(); dupliquer(); }
-    else if (cmd && k === 'u') {
-      e.preventDefault();
-      if (!idsN().length && !idsL().length) return;
-      avant();
-      var nouvelEtatU = null;
-      if (idsN().length) {
-        var n0 = noeud(idsN()[0]);
-        nouvelEtatU = !sn(n0).u;
-        idsN().forEach(function (i) { var n = noeud(i); n.style = n.style || {}; n.style.u = nouvelEtatU; });
-      }
-      if (idsL().length) {
-        if (nouvelEtatU === null) nouvelEtatU = !sl(lien(idsL()[0])).u;
-        idsL().forEach(function (i) { var l = lien(i); l.style = l.style || {}; l.style.u = nouvelEtatU; });
-      }
-      maj();
-      toast(nouvelEtatU ? 'Texte souligné.' : 'Soulignement retiré.');
-    }
+    else if (cmd && k === 'u') { e.preventDefault(); basculerSoulignement(); }
     else if (cmd && k === 'b') {
       e.preventDefault();
       if (!idsN().length) return;
@@ -818,7 +971,10 @@
       var c = JSON.parse(JSON.stringify(o)); c.id = 'n' + (++doc.seq); c.x += 36; c.y += 36; map[o.id] = c.id; doc.nodes.push(c);
     });
     presse.links.forEach(function (l) {
-      doc.links.push({ id: 'l' + (++doc.seq), from: map[l.from], to: map[l.to], label: l.label, style: l.style });
+      var c = JSON.parse(JSON.stringify(l));
+      c.id = 'l' + (++doc.seq); c.from = map[l.from]; c.to = map[l.to];
+      if (c.foreignKey && map[c.foreignKey.table]) c.foreignKey.table = map[c.foreignKey.table];
+      doc.links.push(c);
     });
     sel.clear(); Object.keys(map).forEach(function (k) { sel.add(map[k]); }); maj();
   }
@@ -826,25 +982,282 @@
     var t = String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9_]+/g, '_').replace(/^(\d)/, '_$1');
     return (t || 'objet').slice(0, 64);
   }
-  function colSql(ligne) {
-    var m = String(ligne).match(/^(\S+)\s+(.+)$/);
-    if (m && /INT|VARCHAR|DATE|TEXT|BOOL|CHAR|DECIMAL|FLOAT|TIME/i.test(m[2])) return identSql(m[1]) + ' ' + m[2];
-    return identSql(ligne) + ' VARCHAR(255)';
+  function attributsNoeud(n, cleParDefaut) {
+    var attrs = lignes(n).map(lireAttribut).filter(function (a) { return a.nom.trim() !== ''; });
+    if (!attrs.some(function (a) { return a.primary; })) {
+      attrs.unshift({ nom: cleParDefaut || 'id', type: 'INTEGER', primary: true, notNull: true, unique: false });
+    }
+    return attrs;
+  }
+  function identMcd(label, fallback) {
+    var id = identSql(label).toLowerCase();
+    return (id === 'objet' ? fallback : id).slice(0, 48);
+  }
+  function cardinalite(card) {
+    var match = String(card || '').match(/^\s*([01])\s*,\s*([1N])\s*$/i);
+    return match ? { min: +match[1], max: match[2].toUpperCase() } : null;
+  }
+  function construireMld(source) {
+    var seq = source.seq || 0, nodes = [], links = [], entites = {}, associations = {}, liensIgnorables = 0, liensTraites = {};
+    function nouveauId() { return 'n' + (++seq); }
+    source.nodes.filter(function (n) { return n.kind === 'entite'; }).forEach(function (n) {
+      var id = nouveauId();
+      entites[n.id] = { id: id, node: n };
+      nodes.push({
+        id: id, kind: 'table', x: n.x, y: n.y, label: n.label,
+        details: attributsNoeud(n, 'id_' + identMcd(n.label, 'entite')).map(formaterAttribut).join('\n'),
+        style: n.style ? JSON.parse(JSON.stringify(n.style)) : undefined
+      });
+    });
+    source.nodes.filter(function (n) { return n.kind === 'association'; }).forEach(function (n) {
+      var connectors = source.links.filter(function (l) {
+        return (l.from === n.id && entites[l.to]) || (l.to === n.id && entites[l.from]);
+      }).map(function (l) {
+        var entityId = l.from === n.id ? l.to : l.from;
+        return { link: l, entityId: entityId, cardinality: cardinalite(l.label) };
+      });
+      var oneSide = connectors.filter(function (c) { return c.cardinality && c.cardinality.max === '1'; });
+      var manySide = connectors.filter(function (c) { return c.cardinality && c.cardinality.max === 'N'; });
+      var direct = connectors.length === 2 && manySide.length === 1 && oneSide.length === 1;
+      if (connectors.length === 2 && connectors.every(function (c) { return c.cardinality && c.cardinality.max === '1'; })) direct = true;
+      if (direct) {
+        associations[n.id] = { node: n, direct: true, connectors: connectors };
+        return;
+      }
+      var id = nouveauId();
+      var attrs = attributsNoeud(n, 'id_' + identMcd(n.label, 'association'));
+      var table = {
+        id: id, kind: 'table', x: n.x, y: n.y, label: n.label,
+        details: attrs.map(formaterAttribut).join('\n'),
+        style: n.style ? JSON.parse(JSON.stringify(n.style)) : undefined
+      };
+      associations[n.id] = { node: n, direct: false, connectors: connectors, table: table };
+      nodes.push(table);
+    });
+    function tableEntite(entityId) {
+      return nodes.filter(function (n) { return entites[entityId] && n.id === entites[entityId].id; })[0];
+    }
+    function ajouterAttributsAssociation(table, association) {
+      var attrs = lignes(table).map(lireAttribut);
+      lignes(association).map(lireAttribut).filter(function (a) { return a.nom && !a.primary; }).forEach(function (a) {
+        var nom = identSql(a.nom);
+        if (attrs.some(function (x) { return identSql(x.nom).toLowerCase() === nom.toLowerCase(); })) {
+          nom = identMcd(association.label, 'association') + '_' + nom;
+        }
+        var suffix = 2, base = nom;
+        while (attrs.some(function (x) { return identSql(x.nom).toLowerCase() === identSql(nom).toLowerCase(); })) nom = base + '_' + suffix++;
+        a.nom = nom; a.primary = false; attrs.push(a);
+      });
+      table.details = attrs.map(formaterAttribut).join('\n');
+    }
+    function ajouterCleEtrangere(table, entityId, lien, required, unique) {
+      var entity = entites[entityId].node;
+      var targetTable = tableEntite(entityId);
+      var targetAttrs = attributsNoeud(entity, 'id_' + identMcd(entity.label, 'entite'));
+      var primary = targetAttrs.filter(function (a) { return a.primary; })[0];
+      var attrs = lignes(table).map(lireAttribut);
+      var foreignName = identSql(primary.nom);
+      function existe(nom) {
+        return attrs.some(function (a) { return identSql(a.nom).toLowerCase() === identSql(nom).toLowerCase(); });
+      }
+      if (existe(foreignName)) foreignName = 'id_' + identMcd(entity.label, 'entite');
+      var base = foreignName, suffix = 2;
+      while (existe(foreignName)) foreignName = base + '_' + suffix++;
+      attrs.push({
+        nom: foreignName, type: primary.type, primary: false,
+        notNull: !!required, unique: !!unique
+      });
+      table.details = attrs.map(formaterAttribut).join('\n');
+      links.push({
+        id: 'l' + (++seq), from: table.id, to: targetTable.id, label: lien.label || '',
+        foreignKey: { table: table.id, column: foreignName }
+      });
+    }
+    Object.keys(associations).forEach(function (id) {
+      var association = associations[id], node = association.node;
+      if (association.direct) {
+        var oneSide = association.connectors.filter(function (c) { return c.cardinality.max === '1'; });
+        var holder = oneSide.filter(function (c) { return c.cardinality.min === 1; })[0] || oneSide[0];
+        var reference = association.connectors.filter(function (c) { return c !== holder; })[0];
+        var holderTable = tableEntite(holder.entityId);
+        var exclusive = association.connectors.every(function (c) { return c.cardinality.max === '1'; });
+        ajouterCleEtrangere(holderTable, reference.entityId, holder.link, holder.cardinality.min === 1, exclusive);
+        ajouterAttributsAssociation(holderTable, node);
+        association.connectors.forEach(function (c) { liensTraites[c.link.id] = true; });
+        return;
+      }
+      association.connectors.forEach(function (c) {
+        var table = association.table;
+        ajouterCleEtrangere(table, c.entityId, c.link, true, false);
+        liensTraites[c.link.id] = true;
+      });
+    });
+    source.links.forEach(function (l) {
+      var fromEntity = entites[l.from], toEntity = entites[l.to];
+      if (fromEntity && toEntity) {
+        links.push({ id: 'l' + (++seq), from: fromEntity.id, to: toEntity.id, label: l.label || '' });
+      } else if (!liensTraites[l.id]) {
+        liensIgnorables++;
+      }
+    });
+    var noeudsIgnorables = source.nodes.filter(function (n) { return n.kind !== 'entite' && n.kind !== 'association'; }).length;
+    return {
+      type: 'MLD', titre: (source.titre || 'Sans titre') + ' — MLD', seq: seq,
+      nodes: nodes, links: links, trash: [], noeudsIgnorables: noeudsIgnorables, liensIgnorables: liensIgnorables
+    };
+  }
+  function citerSql(nom, dialect) {
+    var id = identSql(nom);
+    if (dialect === 'mysql') return '`' + id.replace(/`/g, '``') + '`';
+    if (dialect === 'sqlserver') return '[' + id.replace(/]/g, ']]') + ']';
+    return '"' + id.replace(/"/g, '""') + '"';
+  }
+  function typePourDialecte(type, dialect) {
+    type = String(type || '').trim().toUpperCase();
+    if (!typeSqlValide(type)) throw new Error('Type de données non pris en charge : ' + type);
+    var base = type.split(/[ (]/)[0];
+    if (dialect === 'postgresql') {
+      if (base === 'DATETIME') return 'TIMESTAMP';
+      if (base === 'TINYINT') return 'SMALLINT';
+      if (base === 'DOUBLE') return 'DOUBLE PRECISION';
+      if (type === 'BOOLEAN' || type === 'BOOL') return 'BOOLEAN';
+      return type.replace(/\s+UNSIGNED$/, '');
+    }
+    if (dialect === 'sqlite') {
+      if (/^(BOOLEAN|BOOL|BIT|TINYINT|SMALLINT|INT|INTEGER|BIGINT|SERIAL|BIGSERIAL)$/.test(base)) return 'INTEGER';
+      if (/^(FLOAT|REAL|DOUBLE)$/.test(base)) return 'REAL';
+      if (/^(VARCHAR|NVARCHAR|CHAR|NCHAR)$/.test(base)) return 'TEXT';
+      if (base === 'DATETIME' || base === 'TIMESTAMP') return 'TEXT';
+      return type.replace(/\s+UNSIGNED$/, '');
+    }
+    if (dialect === 'sqlserver') {
+      if (base === 'BOOLEAN' || base === 'BOOL') return 'BIT';
+      if (base === 'DATETIME' || base === 'TIMESTAMP') return 'DATETIME2';
+      if (base === 'DOUBLE') return 'FLOAT';
+      if (base === 'TINYINT') return 'TINYINT';
+      if (base === 'SERIAL') return 'INT';
+      if (base === 'BIGSERIAL') return 'BIGINT';
+      return type.replace(/\s+UNSIGNED$/, '');
+    }
+    if (base === 'BOOLEAN' || base === 'BOOL') return 'TINYINT(1)';
+    return type;
+  }
+  function texteCardinalite(card) { return /,\s*N\s*$/i.test(String(card || '')); }
+  function genererSqlText(dialect) {
+    var schema = doc.type === 'MCD' ? construireMld(doc) : doc;
+    var tables = schema.nodes.filter(function (n) { return n.kind === 'table' || n.kind === 'entite'; });
+    if (!tables.length) throw new Error('Ajoutez des entités (MCD) ou des tables (MLD).');
+    var colonnes = {};
+    var nomsTables = {};
+    tables.forEach(function (table) {
+      var nomTable = identSql(table.label).toLowerCase();
+      if (nomsTables[nomTable]) throw new Error('Plusieurs tables portent le même nom SQL : ' + table.label);
+      nomsTables[nomTable] = true;
+      var attrs = attributsNoeud(table, 'id');
+      var nomsColonnes = {};
+      attrs.forEach(function (attr) {
+        var nomColonne = identSql(attr.nom).toLowerCase();
+        if (nomsColonnes[nomColonne]) throw new Error('Attribut en double dans la table « ' + table.label + ' » : ' + attr.nom);
+        nomsColonnes[nomColonne] = true;
+      });
+      if (!lignes(table).length) attrs[0].autoIncrement = true;
+      colonnes[table.id] = attrs;
+    });
+    var foreignKeys = [];
+    (schema.links || []).forEach(function (link) {
+      var sourceTable, targetTable, column;
+      if (link.foreignKey) {
+        sourceTable = tables.filter(function (n) { return n.id === link.foreignKey.table; })[0];
+        targetTable = tables.filter(function (n) { return n.id === link.to; })[0];
+        column = link.foreignKey.column;
+      } else if (texteCardinalite(link.label)) {
+        sourceTable = tables.filter(function (n) { return n.id === link.to; })[0];
+        targetTable = tables.filter(function (n) { return n.id === link.from; })[0];
+        if (sourceTable && targetTable) {
+          var targetPrimary = colonnes[targetTable.id].filter(function (a) { return a.primary; })[0];
+          column = identMcd(targetTable.label, 'table') + '_id';
+          if (colonnes[sourceTable.id].some(function (a) { return identSql(a.nom).toLowerCase() === identSql(column).toLowerCase(); })) {
+            column = colonnes[sourceTable.id].filter(function (a) { return identSql(a.nom).toLowerCase() === identSql(column).toLowerCase(); })[0].nom;
+          } else {
+            colonnes[sourceTable.id].push({ nom: column, type: targetPrimary.type, primary: false, notNull: false, unique: false });
+          }
+        }
+      }
+      if (sourceTable && targetTable && column) {
+        var pk = colonnes[targetTable.id].filter(function (a) { return a.primary; })[0];
+        if (pk) foreignKeys.push({ source: sourceTable, target: targetTable, column: column, primary: pk.nom });
+      }
+    });
+    var titre = String(doc.titre || 'diagramme').replace(/[\r\n]+/g, ' ');
+    var sql = '-- Script généré par Merise Studio (« ' + titre + ' ») pour ' + dialect + '\n-- Vérifiez les types et les règles avant exécution.\n';
+    if (dialect === 'sqlite') sql += 'PRAGMA foreign_keys = ON;\n';
+    if (schema.noeudsIgnorables || schema.liensIgnorables) {
+      sql += '-- ATTENTION : ' + (schema.noeudsIgnorables || 0) + ' élément(s) et ' + (schema.liensIgnorables || 0) + ' liaison(s) MCD non pris en charge ont été ignorés.\n';
+    }
+    sql += '\n';
+    tables.forEach(function (table) {
+      var attrs = colonnes[table.id], primary = attrs.filter(function (a) { return a.primary; });
+      var defs = attrs.map(function (a) {
+        if (!a.nom.trim()) throw new Error('Un attribut ne possède pas de nom.');
+        var columnType = typePourDialecte(a.type, dialect);
+        var def = '  ' + citerSql(a.nom, dialect) + ' ' + columnType;
+        if (a.autoIncrement) {
+          if (dialect === 'mysql') def += ' AUTO_INCREMENT';
+          else if (dialect === 'postgresql') def += ' GENERATED BY DEFAULT AS IDENTITY';
+          else if (dialect === 'sqlserver') def += ' IDENTITY(1,1)';
+        }
+        if (primary.length === 1 && a.primary) def += ' PRIMARY KEY';
+        if ((a.notNull || a.primary) && !a.primary) def += ' NOT NULL';
+        if (a.unique && !a.primary) def += ' UNIQUE';
+        return def;
+      });
+      if (primary.length > 1) defs.push('  PRIMARY KEY (' + primary.map(function (a) { return citerSql(a.nom, dialect); }).join(', ') + ')');
+      if (dialect === 'sqlite') {
+        defs = defs.map(function (def) { return def.replace(/ PRIMARY KEY$/, ' PRIMARY KEY'); });
+        defs = defs.map(function (def) { return def.replace(/INTEGER PRIMARY KEY$/, 'INTEGER PRIMARY KEY'); });
+      }
+      foreignKeys.filter(function (fk) { return fk.source.id === table.id; }).forEach(function (fk) {
+        defs.push('  FOREIGN KEY (' + citerSql(fk.column, dialect) + ') REFERENCES ' +
+          citerSql(fk.target.label, dialect) + ' (' + citerSql(fk.primary, dialect) + ')');
+      });
+      sql += 'CREATE TABLE ' + citerSql(table.label, dialect) + ' (\n' + defs.join(',\n') + '\n);\n\n';
+    });
+    return sql;
   }
   function genererSql() {
-    var tables = doc.nodes.filter(function (n) { return n.kind === 'table' || n.kind === 'entite'; });
-    if (!tables.length) { toast('Ajoutez des entités (MCD) ou des tables (MLD).'); return; }
-    var sql = '-- Script généré par Merise Studio (« ' + (doc.titre || 'diagramme') + ' »)\n-- À relire avant exécution.\n\n';
-    tables.forEach(function (n) {
-      var cols = lignes(n); if (!cols.length) cols = ['id INT PRIMARY KEY AUTO_INCREMENT'];
-      sql += 'CREATE TABLE ' + identSql(n.label) + ' (\n  ' + cols.map(colSql).join(',\n  ') + '\n);\n\n';
-    });
-    doc.nodes.filter(function (n) { return n.kind === 'association'; }).forEach(function (n) {
-      var cols = lignes(n);
-      sql += '-- Association « ' + n.label + ' »\nCREATE TABLE ' + identSql(n.label) + ' (\n  id INT PRIMARY KEY AUTO_INCREMENT' +
-        (cols.length ? ',\n  ' + cols.map(colSql).join(',\n  ') : '') + '\n);\n\n';
-    });
-    afficherTexte('SQL généré', sql);
+    var dialectes = [['mysql', 'MySQL / MariaDB'], ['postgresql', 'PostgreSQL'], ['sqlite', 'SQLite'], ['sqlserver', 'SQL Server']];
+    dialogue('<h2>Générer le SQL</h2><p>Choisissez le SGBD cible.</p>' +
+      cSelect('sSgbd', 'SGBD', dialectes, 'mysql') +
+      '<p><button type="button" class="primaire" id="bGenererSql">Générer le script</button> ' +
+      '<button type="button" data-fermer>Annuler</button></p>');
+    $('#bGenererSql').onclick = function () {
+      var dialect = $('#sSgbd').value;
+      try { afficherTexte('SQL généré — ' + $('#sSgbd').selectedOptions[0].textContent, genererSqlText(dialect)); }
+      catch (e) { toast('Génération SQL impossible : ' + e.message); }
+    };
+  }
+  function transformerMcdMld() {
+    if (doc.type !== 'MCD') { toast('Choisissez un diagramme MCD avant de créer le MLD.'); return; }
+    if (!doc.nodes.some(function (n) { return n.kind === 'entite'; })) { toast('Ajoutez au moins une entité au MCD.'); return; }
+    var mld = construireMld(doc);
+    if (!mld.nodes.length) { toast('Aucune table n’a pu être générée à partir de ce MCD.'); return; }
+    avant();
+    doc.type = mld.type;
+    doc.titre = mld.titre;
+    doc.seq = mld.seq;
+    doc.nodes = mld.nodes;
+    doc.links = mld.links;
+    doc.trash = [];
+    sel.clear();
+    ligneSel = null;
+    $('#titre').value = doc.titre;
+    $('#type').value = doc.type;
+    palette();
+    maj();
+    var avertissement = mld.noeudsIgnorables || mld.liensIgnorables
+      ? ' ' + mld.noeudsIgnorables + ' élément(s) et ' + mld.liensIgnorables + ' liaison(s) non pris en charge ont été ignorés.'
+      : '';
+    toast('MLD généré : ' + mld.nodes.length + ' table(s), ' + mld.links.length + ' relation(s).' + avertissement);
   }
   function dictionnaire() {
     if (!doc.nodes.length) { toast('Le diagramme est vide.'); return; }
@@ -897,9 +1310,9 @@
   }
   function exempleBoutique() {
     doc.seq = 0;
-    var c = noeudEx('entite', 80, 80, 'Client', 'id_client\nnom\nemail'),
-      cmd = noeudEx('entite', 420, 80, 'Commande', 'id_commande\ndate\nmontant'),
-      p = noeudEx('entite', 250, 320, 'Produit', 'id_produit\nlibelle\nprix'),
+    var c = noeudEx('entite', 80, 80, 'Client', '#id_client\nnom\nemail'),
+      cmd = noeudEx('entite', 420, 80, 'Commande', '#id_commande\ndate\nmontant'),
+      p = noeudEx('entite', 250, 320, 'Produit', '#id_produit\nlibelle\nprix'),
       passer = noeudEx('association', 250, 80, 'Passe', ''),
       contenir = noeudEx('association', 330, 200, 'Contient', 'quantite');
     chargerExemple('MCD', 'Boutique', [c, cmd, p, passer, contenir], [
@@ -923,7 +1336,7 @@
     ]);
   }
   function raccourcis() {
-    dialogue('<h2>Raccourcis</h2><p>Ctrl+S enregistrer · Ctrl+Z / Y annuler / rétablir · Ctrl+A tout sélectionner<br>Ctrl+C / V / D copier / coller / dupliquer · Suppr supprimer · Maj+clic sélection multiple</p>' +
+    dialogue('<h2>Raccourcis</h2><p>Ctrl+S enregistrer · Ctrl+Z / Y annuler / rétablir · Ctrl+A tout sélectionner<br>Ctrl+C / V / D copier / coller / dupliquer · Suppr supprimer · Maj+clic sélection multiple<br>Ctrl+U souligne seulement la ligne cliquée (nom ou attribut), pas toute la table.</p>' +
       '<p><a href="aide.html">Ouvrir le guide complet</a></p><p><button data-fermer>Fermer</button></p>');
   }
 
@@ -986,7 +1399,7 @@
   function ouvrirDoc(o) {
     if (!o || !Array.isArray(o.nodes)) { toast('Fichier invalide.'); return; }
     doc = Object.assign(nouveau(), o); doc.links = doc.links || []; doc.trash = doc.trash || [];
-    undo = []; redo = []; sel.clear(); $('#titre').value = doc.titre; $('#type').value = doc.type; palette(); maj();
+    undo = []; redo = []; sel.clear(); ligneSel = null; $('#titre').value = doc.titre; $('#type').value = doc.type; palette(); maj();
   }
 
   /* ---------- Utilitaires d'interface ---------- */
@@ -1024,6 +1437,8 @@
   $('#bAlM').onclick = function () { aligner('m'); };
   $('#bAlB').onclick = function () { aligner('b'); };
   $('#bSql').onclick = genererSql;
+  var bMld = $('#bMld');
+  if (bMld) bMld.onclick = transformerMcdMld;
   $('#bDico').onclick = dictionnaire;
   $('#bExemples').onclick = exemples;
   $('#bRaccourcis').onclick = raccourcis;

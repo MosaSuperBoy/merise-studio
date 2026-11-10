@@ -49,6 +49,74 @@
     return j;
   }
 
+  // --- Mode maintenance : bouton de l'en-tête + carte « Mon compte » ---
+  var maintenanceActif = null; // null = état inconnu (chargement ou erreur)
+
+  function majBoutonsMaintenance(message) {
+    var haut = $('#bMaintenanceHaut');
+    var carte = $('#bMaintenance');
+    var tableau = $('#bMaintenanceDashboard');
+    var etat = $('#maintenanceEtat');
+    var etatTableau = $('#maintenanceDashboardEtat');
+    if (haut) {
+      haut.textContent = maintenanceActif ? '🛠️ Maintenance : ACTIVE' : '🛠️ Maintenance';
+      haut.classList.toggle('maintenance-on', maintenanceActif === true);
+      haut.title = maintenanceActif === null ? 'État inconnu : cliquer pour réessayer'
+        : (maintenanceActif ? 'Le site est en maintenance : cliquer pour le rouvrir' : 'Mettre le site en maintenance');
+    }
+    if (carte) {
+      carte.textContent = maintenanceActif === null ? 'Réessayer'
+        : (maintenanceActif ? 'Désactiver la maintenance' : 'Activer la maintenance');
+      carte.disabled = false;
+      carte.setAttribute('aria-pressed', maintenanceActif ? 'true' : 'false');
+    }
+    if (tableau) {
+      tableau.textContent = maintenanceActif === null ? 'Réessayer'
+        : (maintenanceActif ? 'Désactiver la maintenance' : 'Activer la maintenance');
+      tableau.disabled = false;
+      tableau.setAttribute('aria-pressed', maintenanceActif ? 'true' : 'false');
+    }
+    if (etat) {
+      etat.textContent = message || (maintenanceActif === null ? 'État du site inconnu.'
+        : (maintenanceActif ? 'La maintenance est activée.' : 'La maintenance est désactivée.'));
+    }
+    if (etatTableau) {
+      etatTableau.textContent = message || (maintenanceActif === null ? 'État du site inconnu.'
+        : (maintenanceActif ? 'La maintenance est activée.' : 'La maintenance est désactivée.'));
+    }
+  }
+
+  async function chargerMaintenance() {
+    try {
+      var etat = await appel('maintenance_status');
+      maintenanceActif = !!etat.actif;
+      majBoutonsMaintenance();
+    } catch (err) {
+      maintenanceActif = null;
+      majBoutonsMaintenance('Impossible de charger l’état : ' + err.message);
+    }
+  }
+
+  async function basculerMaintenance() {
+    if (maintenanceActif === null) { await chargerMaintenance(); return; }
+    var prochainEtat = !maintenanceActif;
+    if (!confirm(prochainEtat
+      ? 'Activer la maintenance ? Les visiteurs ne pourront plus utiliser le site.'
+      : 'Désactiver la maintenance et rouvrir le site aux visiteurs ?')) return;
+    var boutons = [$('#bMaintenanceHaut'), $('#bMaintenance'), $('#bMaintenanceDashboard')];
+    boutons.forEach(function (b) { if (b) b.disabled = true; });
+    try {
+      var resultat = await appel('maintenance_set', { actif: prochainEtat });
+      maintenanceActif = !!resultat.actif;
+      majBoutonsMaintenance();
+      toast(maintenanceActif ? 'Mode maintenance activé.' : 'Mode maintenance désactivé.');
+    } catch (err) {
+      majBoutonsMaintenance('Impossible de modifier l’état : ' + err.message);
+      toast('Maintenance non modifiée : ' + err.message, 5000);
+    }
+    boutons.forEach(function (b) { if (b) b.disabled = false; });
+  }
+
   // --- Gestion du Thème ---
   function initTheme() {
     var sombre = localStorage.getItem('ms_theme') === 'sombre';
@@ -180,6 +248,7 @@
         '</div>' +
         '<div class="admin-actions-haut">' +
           '<span class="admin-user-info" title="Connecté en tant qu\'administrateur">👤 ' + esc(user.nom) + '</span>' +
+          '<button type="button" id="bMaintenanceHaut" class="btn-maintenance-haut" title="Activer ou désactiver le mode maintenance">🔧 Maintenance</button>' +
           '<button type="button" id="bMdpRapide" title="Changer le mot de passe administrateur">🔑 Mot de passe</button>' +
           '<a href="editeur.html" class="btn" style="background:#fff;color:var(--vert2);">🎨 Éditeur</a>' +
           '<a href="index.html" class="btn" style="background:#fff;color:var(--vert2);">🌐 Site</a>' +
@@ -190,6 +259,7 @@
       '<main class="admin-conteneur">' +
         '<nav class="admin-onglets" role="tablist">' +
           '<button class="admin-onglet-btn actif" data-tab="stats">📊 Vue d\'ensemble</button>' +
+          '<button class="admin-onglet-btn admin-onglet-maintenance" data-tab="maintenance">🔧 Maintenance</button>' +
           '<button class="admin-onglet-btn" data-tab="users">👥 Utilisateurs <span class="pillule" id="badgeNbUsers">0</span></button>' +
           '<button class="admin-onglet-btn" data-tab="diagrammes">📐 Diagrammes <span class="pillule" id="badgeNbDiags">0</span></button>' +
           '<button class="admin-onglet-btn" data-tab="messages">✉️ Messages <span class="pillule" id="badgeNbMsgs">0</span></button>' +
@@ -211,6 +281,8 @@
     };
 
     $('#bMdpRapide').onclick = vueChangerMonMdp;
+    $('#bMaintenanceHaut').onclick = basculerMaintenance;
+    chargerMaintenance();
     // Gestion du clic sur les onglets
     var onglets = document.querySelectorAll('.admin-onglet-btn');
     onglets.forEach(function (btn) {
@@ -237,6 +309,7 @@
       else if (nom === 'messages') await afficherMessages(zone);
       else if (nom === 'journal') await afficherJournal(zone);
       else if (nom === 'moncompte') await afficherMonCompte(zone);
+      else if (nom === 'maintenance') await afficherOngletMaintenance(zone);
     } catch (err) {
       zone.innerHTML = '<p class="erreur">Erreur : ' + esc(err.message) + '</p>';
     }
@@ -291,8 +364,16 @@
         '</div>' +
       '</div>' +
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.5rem;">' +
-        '<div class="carte">' +
-          '<h2>⚡ Actions Rapides</h2>' +
+      '<div class="carte maintenance-dashboard">' +
+        '<div><h2>🔧 Maintenance du site</h2>' +
+          '<p id="maintenanceDashboardEtat" class="aide">Chargement de l’état du site…</p>' +
+          '<p class="aide">L’espace administrateur reste accessible pendant la maintenance.</p></div>' +
+        '<button type="button" id="bMaintenanceDashboard" class="primaire">Chargement…</button>' +
+      '</div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.5rem;">' +
+      '<div class="carte">' +
+        '<h2>⚡ Actions Rapides</h2>' +
           '<div style="display:flex;flex-direction:column;gap:.6rem;margin-top:.8rem;">' +
             '<button type="button" id="bAjoutUserRapide" class="primaire" style="text-align:left;">➕ Ajouter un nouvel utilisateur</button>' +
             '<button type="button" id="bVoirMessagesRapide" style="text-align:left;">✉️ Consulter les messages de contact (' + s.messages_non_lus + ' non lus)</button>' +
@@ -316,6 +397,9 @@
     if (bMsg) bMsg.onclick = function () {
       document.querySelector('[data-tab="messages"]').click();
     };
+    var bMaintenance = $('#bMaintenanceDashboard');
+    if (bMaintenance) bMaintenance.onclick = basculerMaintenance;
+    majBoutonsMaintenance();
   }
 
   // ==========================================
@@ -812,6 +896,19 @@
     filtrerJournal();
   }
 
+  async function afficherOngletMaintenance(zone) {
+    zone.innerHTML =
+      '<div class="carte" style="max-width:680px">' +
+        '<h2>🔧 Maintenance du site</h2>' +
+        '<p id="maintenanceEtat" class="aide">Chargement de l’état du site…</p>' +
+        '<p class="aide">En maintenance, les visiteurs ne peuvent plus utiliser le site. L’espace administrateur reste accessible.</p>' +
+        '<button type="button" id="bMaintenance" class="primaire">Chargement…</button>' +
+      '</div>';
+    $('#bMaintenance').onclick = basculerMaintenance;
+    majBoutonsMaintenance();
+    if (maintenanceActif === null) await chargerMaintenance();
+  }
+
   // ==========================================
   // ONGLET 6 : MON COMPTE & MOT DE PASSE
   // ==========================================
@@ -890,40 +987,9 @@
       }
     };
 
-    var maintenanceActif = null;
-    var etatMaintenance = $('#maintenanceEtat');
-    var boutonMaintenance = $('#bMaintenance');
-    function afficherEtatMaintenance() {
-      etatMaintenance.textContent = maintenanceActif ? 'La maintenance est activée.' : 'La maintenance est désactivée.';
-      boutonMaintenance.textContent = maintenanceActif ? 'Désactiver la maintenance' : 'Activer la maintenance';
-      boutonMaintenance.disabled = false;
-      boutonMaintenance.setAttribute('aria-pressed', maintenanceActif ? 'true' : 'false');
-    }
-    try {
-      var etat = await appel('maintenance_status');
-      maintenanceActif = !!etat.actif;
-      afficherEtatMaintenance();
-    } catch (err) {
-      etatMaintenance.textContent = 'Impossible de charger l’état : ' + err.message;
-      boutonMaintenance.textContent = 'Indisponible';
-    }
-    boutonMaintenance.onclick = async function () {
-      if (maintenanceActif === null) return;
-      var prochainEtat = !maintenanceActif;
-      if (!confirm(prochainEtat
-        ? 'Activer la maintenance ? Les visiteurs ne pourront plus utiliser le site.'
-        : 'Désactiver la maintenance et rouvrir le site aux visiteurs ?')) return;
-      boutonMaintenance.disabled = true;
-      try {
-        var resultat = await appel('maintenance_set', { actif: prochainEtat });
-        maintenanceActif = resultat.actif;
-        afficherEtatMaintenance();
-        toast(maintenanceActif ? 'Mode maintenance activé.' : 'Mode maintenance désactivé.');
-      } catch (err) {
-        etatMaintenance.textContent = 'Impossible de modifier l’état : ' + err.message;
-        boutonMaintenance.disabled = false;
-      }
-    };
+    $('#bMaintenance').onclick = basculerMaintenance;
+    majBoutonsMaintenance();
+    if (maintenanceActif === null) chargerMaintenance();
   }
 
   // Modal raccourci : Changer mon mot de passe
@@ -990,7 +1056,7 @@
       }
       initInterface();
     } catch (e) {
-      vueLogin();
+      vueLogin(e.message || 'Impossible de vérifier la session administrateur.');
     }
   }
 

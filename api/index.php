@@ -4,7 +4,7 @@ require __DIR__ . '/config.php';
 header('Content-Type: application/json; charset=utf-8');
 
 // Toute erreur inattendue renvoie du JSON propre au lieu d'une page blanche
-set_exception_handler(function ($e) { http_response_code(500); echo json_encode(['erreur' => 'Erreur serveur'], JSON_UNESCAPED_UNICODE); });
+set_exception_handler(function ($e) { error_log('Merise Studio : ' . $e->getMessage()); http_response_code(500); echo json_encode(['erreur' => 'Erreur serveur'], JSON_UNESCAPED_UNICODE); });
 function rep($d, $c = 200) { http_response_code($c); echo json_encode($d, JSON_UNESCAPED_UNICODE); exit; }
 function err($m, $c = 400) { rep(['erreur' => $m], $c); }
 function motDePasseValide($motDePasse) {
@@ -31,11 +31,33 @@ function installer() {
   $bd->exec('USE `' . DB_NOM . '`');
   $bd->exec(schemaSql());
 }
+// 1) Connexion : seule une vraie panne de connexion bloque toute l'API
 try {
   try { $bd = connexion(true); }
   catch (Throwable $e) { installer(); $bd = connexion(true); }          // base absente : on la crée
+} catch (Throwable $e) {
+  error_log('Merise Studio : connexion MySQL impossible : ' . $e->getMessage());
+  err('Base de données inaccessible. Vérifiez les accès MySQL dans api/config.local.php (hôte, nom, utilisateur, mot de passe), ou créez une base vide nommée « ' . DB_NOM . ' » : les tables se créeront toutes seules.', 500);
+}
+
+// 2) Tables indispensables (comptes, diagrammes, sessions, journal)
+try {
   if (!$bd->query("SHOW TABLES LIKE 'utilisateurs'")->fetch()) $bd->exec(schemaSql()); // tables absentes : on les crée
-  $bd->exec("CREATE TABLE IF NOT EXISTS messages (
+} catch (Throwable $e) {
+  error_log('Merise Studio : création des tables impossible : ' . $e->getMessage());
+  err('La base est joignable mais ses tables n\'ont pas pu être créées. Importez db/merise_studio.sql avec phpMyAdmin.', 500);
+}
+
+// 3) Tables facultatives (contact, réinitialisation, maintenance) : une erreur ici ne doit jamais arrêter tout le site.
+//    $sqlSecours est tentée si la première requête échoue (ex. clé étrangère refusée sur une ancienne base).
+function tableFacultative($bd, $sql, $sqlSecours = null) {
+  foreach ($sqlSecours === null ? [$sql] : [$sql, $sqlSecours] as $requete) {
+    try { $bd->exec($requete); return true; }
+    catch (Throwable $e) { error_log('Merise Studio : table facultative non créée : ' . $e->getMessage()); }
+  }
+  return false;
+}
+tableFacultative($bd, "CREATE TABLE IF NOT EXISTS messages (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     nom VARCHAR(100) NOT NULL,
     email VARCHAR(190) NOT NULL,
@@ -44,7 +66,7 @@ try {
     lu TINYINT(1) NOT NULL DEFAULT 0,
     cree_le DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB");
-  $bd->exec("CREATE TABLE IF NOT EXISTS password_reset_codes (
+tableFacultative($bd, "CREATE TABLE IF NOT EXISTS password_reset_codes (
     utilisateur_id INT UNSIGNED PRIMARY KEY,
     code_hash VARCHAR(255) NOT NULL,
     tentatives TINYINT UNSIGNED NOT NULL DEFAULT 0,
@@ -52,25 +74,36 @@ try {
     cree_le DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_reset_user FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs(id) ON DELETE CASCADE,
     INDEX idx_reset_expire (expire_le)
+  ) ENGINE=InnoDB", "CREATE TABLE IF NOT EXISTS password_reset_codes (
+    utilisateur_id INT UNSIGNED PRIMARY KEY,
+    code_hash VARCHAR(255) NOT NULL,
+    tentatives TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    expire_le DATETIME NOT NULL,
+    cree_le DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_reset_expire (expire_le)
   ) ENGINE=InnoDB");
-  $bd->exec("CREATE TABLE IF NOT EXISTS site_settings (
+if (tableFacultative($bd, "CREATE TABLE IF NOT EXISTS site_settings (
     setting_key VARCHAR(64) PRIMARY KEY,
     setting_value VARCHAR(255) NOT NULL,
     modifie_le DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-  ) ENGINE=InnoDB");
-  $bd->exec("INSERT IGNORE INTO site_settings(setting_key,setting_value) VALUES('maintenance','0')");
+  ) ENGINE=InnoDB")) {
+  try { $bd->exec("INSERT IGNORE INTO site_settings(setting_key,setting_value) VALUES('maintenance','0')"); }
+  catch (Throwable $e) { error_log('Merise Studio : réglage maintenance non initialisé : ' . $e->getMessage()); }
+}
 
-  // Désactive les installations qui utilisent encore le mot de passe administrateur publié.
+// Désactive les installations qui utilisent encore le mot de passe administrateur publié.
+try {
   $hashRootParDefaut = '$2y$12$39eevJ5B5Mdbg.cZT1zEaOvtR72aD..rHRdU4kbehbZBVEQZ9icVS';
   $desactiverRoot = $bd->prepare("UPDATE utilisateurs SET actif=0 WHERE LOWER(nom)='root' AND LOWER(email)='root@merise.local' AND mot_de_passe=?");
   $desactiverRoot->execute([$hashRootParDefaut]);
 } catch (Throwable $e) {
-  err('Base de données inaccessible. Vérifiez api/config.php, ou créez une base vide nommée « ' . DB_NOM . ' » : les tables se créeront toutes seules.', 500);
+  error_log('Merise Studio : contrôle du compte root impossible : ' . $e->getMessage());
 }
 
 $in = json_decode(file_get_contents('php://input'), true) ?: [];
 $action = $_GET['action'] ?? '';
-$maintenanceActive = $bd->query("SELECT setting_value FROM site_settings WHERE setting_key='maintenance'")->fetchColumn() === '1';
+try { $maintenanceActive = (string)$bd->query("SELECT setting_value FROM site_settings WHERE setting_key='maintenance'")->fetchColumn() === '1'; }
+catch (Throwable $e) { $maintenanceActive = false; } // table des réglages indisponible : le site reste ouvert
 
 function journal($bd, $u, $a, $d = null) { $bd->prepare('INSERT INTO journal(utilisateur_id,action,details) VALUES(?,?,?)')->execute([$u, $a, $d]); }
 function pub($u) { return ['id' => (int)$u['id'], 'nom' => $u['nom'], 'email' => $u['email'], 'role' => $u['role']]; }
@@ -302,8 +335,13 @@ switch ($action) {
   case 'maintenance_set':
     if (!is_bool($in['actif'] ?? null)) err('État de maintenance invalide');
     $valeur = $in['actif'] ? '1' : '0';
-    $bd->prepare("INSERT INTO site_settings(setting_key,setting_value) VALUES('maintenance',?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)")
-      ->execute([$valeur]);
+    try {
+      $bd->prepare("INSERT INTO site_settings(setting_key,setting_value) VALUES('maintenance',?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value)")
+        ->execute([$valeur]);
+    } catch (Throwable $e) {
+      error_log('Merise Studio : maintenance non enregistrée : ' . $e->getMessage());
+      err('Impossible d\'enregistrer l\'état de maintenance (table site_settings indisponible).', 500);
+    }
     journal($bd, $uid, 'maintenance_modifiee', $valeur);
     rep(['ok' => true, 'actif' => $in['actif']]);
   case 'admin_stats':

@@ -63,6 +63,24 @@
   flex: 1;
 }
 
+.maintenance-dashboard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  border-left: 4px solid var(--orange);
+}
+
+.maintenance-dashboard h2,
+.maintenance-dashboard p {
+  margin-top: 0;
+}
+
+.maintenance-dashboard button {
+  flex: 0 0 auto;
+}
+
 /* Écran de connexion si non connecté */
 .auth-box {
   max-width: 480px;
@@ -603,6 +621,10 @@ html.sombre .badge-type {
     flex-direction: column;
     align-items: stretch;
   }
+  .maintenance-dashboard {
+    align-items: stretch;
+    flex-direction: column;
+  }
   .admin-actions-haut {
     justify-content: flex-start;
   }
@@ -614,4 +636,39 @@ html.sombre .badge-type {
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* Bouton de maintenance : toujours visible dans l'en-tête et dans les onglets */
+.btn-maintenance-haut,
+#bMaintenanceHaut {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  background: linear-gradient(135deg, var(--orange), var(--orange2)) !important;
+  color: #fff !important;
+  font-weight: 800;
+  border: 2px solid #fff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .28);
+}
+
+.admin-onglet-maintenance {
+  display: inline-flex !important;
+  visibility: visible !important;
+  background: #fff7eb;
+  color: var(--orange2) !important;
+  border: 1px dashed var(--orange);
+  font-weight: 800;
+}
+
+.admin-onglet-maintenance.actif {
+  background: var(--orange) !important;
+  color: #fff !important;
+  border: 0;
+}
+
+.admin-actions-haut button.maintenance-on {
+  background: var(--orange2);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px #fff6;
 }
