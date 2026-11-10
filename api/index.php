@@ -44,6 +44,15 @@ try {
     lu TINYINT(1) NOT NULL DEFAULT 0,
     cree_le DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB");
+  $bd->exec("CREATE TABLE IF NOT EXISTS password_reset_codes (
+    utilisateur_id INT UNSIGNED PRIMARY KEY,
+    code_hash VARCHAR(255) NOT NULL,
+    tentatives TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    expire_le DATETIME NOT NULL,
+    cree_le DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_reset_user FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs(id) ON DELETE CASCADE,
+    INDEX idx_reset_expire (expire_le)
+  ) ENGINE=InnoDB");
 
   // Désactive les installations qui utilisent encore le mot de passe administrateur publié.
   $hashRootParDefaut = '$2y$12$39eevJ5B5Mdbg.cZT1zEaOvtR72aD..rHRdU4kbehbZBVEQZ9icVS';
@@ -100,6 +109,104 @@ if ($action === 'login') {
   $bd->prepare('UPDATE utilisateurs SET derniere_connexion=NOW() WHERE id=?')->execute([$u['id']]);
   journal($bd, $u['id'], 'connexion');
   rep(['jeton' => ouvrirSession($bd, $u['id']), 'utilisateur' => pub($u)]);
+}
+if ($action === 'password_reset_request') {
+  $email = strtolower(trim($in['email'] ?? ''));
+  if (!filter_var($email, FILTER_VALIDATE_EMAIL)) err('Adresse e-mail invalide');
+  $message = 'Si un compte actif correspond à cette adresse, un code de réinitialisation vient de lui être envoyé.';
+  $s = $bd->prepare('SELECT id FROM utilisateurs WHERE LOWER(email)=? AND actif=1 LIMIT 1');
+  $s->execute([$email]);
+  $utilisateurId = $s->fetchColumn();
+  if ($utilisateurId) {
+    $s = $bd->prepare('SELECT cree_le > DATE_SUB(NOW(), INTERVAL 60 SECOND) FROM password_reset_codes WHERE utilisateur_id=?');
+    $s->execute([$utilisateurId]);
+    if ($s->fetchColumn()) rep(['ok' => true, 'message' => $message]);
+
+    $code = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+    $hashCode = password_hash($code, PASSWORD_DEFAULT);
+    $bd->prepare('REPLACE INTO password_reset_codes(utilisateur_id,code_hash,tentatives,expire_le,cree_le) VALUES(?,?,0,DATE_ADD(NOW(),INTERVAL 15 MINUTE),NOW())')
+      ->execute([$utilisateurId, $hashCode]);
+
+    $expediteur = defined('MAIL_FROM_ADDRESS') ? MAIL_FROM_ADDRESS : 'no-reply@localhost';
+    if (filter_var($expediteur, FILTER_VALIDATE_EMAIL)) {
+      $sujet = '=?UTF-8?B?' . base64_encode('Code de réinitialisation — Merise Studio') . '?=';
+      $texte = "Bonjour,\n\nVotre code de réinitialisation Merise Studio est : $code\n\nCe code expire dans 15 minutes et ne peut être utilisé qu'une seule fois. Si vous n'avez pas demandé cette réinitialisation, ignorez ce message.\n";
+      $logo = file_get_contents(__DIR__ . '/../logo/logo-merise-studio.png');
+      $envoye = false;
+      if ($logo === false) {
+        error_log('Merise Studio : logo du courriel de réinitialisation introuvable.');
+      } else {
+        $frontiere = '=_MeriseStudio_' . bin2hex(random_bytes(16));
+        $alternative = $frontiere . '_alternative';
+        $html = '<!doctype html><html lang="fr"><body style="margin:0;padding:24px;background:#f4f7f5;font-family:Arial,sans-serif;color:#173b2b;">' .
+          '<div style="max-width:480px;margin:auto;padding:28px;background:#fff;border:1px solid #dce8df;border-radius:12px;">' .
+          '<img src="cid:merise-studio-logo" alt="Merise Studio" width="235" height="64" style="display:block;width:235px;height:64px;margin:0 auto 24px;border:0;">' .
+          '<h1 style="font-size:22px;text-align:center;">Réinitialisation du mot de passe</h1>' .
+          '<p>Bonjour, voici votre code de vérification :</p>' .
+          '<p style="padding:16px;background:#f4f7f5;border-radius:8px;font-size:30px;font-weight:bold;letter-spacing:8px;text-align:center;">' . $code . '</p>' .
+          '<p>Ce code expire dans 15 minutes et ne peut être utilisé qu’une seule fois.</p>' .
+          '<p style="font-size:13px;color:#52675a;">Si vous n’avez pas demandé cette réinitialisation, ignorez ce message.</p>' .
+          '</div></body></html>';
+        $corps = '--' . $frontiere . "\r\n" .
+          'Content-Type: multipart/alternative; boundary="' . $alternative . '"' . "\r\n\r\n" .
+          '--' . $alternative . "\r\n" .
+          "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" .
+          chunk_split(base64_encode($texte), 76, "\r\n") .
+          '--' . $alternative . "\r\n" .
+          "Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" .
+          chunk_split(base64_encode($html), 76, "\r\n") .
+          '--' . $alternative . "--\r\n" .
+          '--' . $frontiere . "\r\n" .
+          "Content-Type: image/png; name=\"logo-merise-studio.png\"\r\nContent-Transfer-Encoding: base64\r\n" .
+          "Content-ID: <merise-studio-logo>\r\nContent-Disposition: inline; filename=\"logo-merise-studio.png\"\r\n\r\n" .
+          chunk_split(base64_encode($logo), 76, "\r\n") .
+          '--' . $frontiere . "--\r\n";
+        $entetes = "From: Merise Studio <$expediteur>\r\nMIME-Version: 1.0\r\n" .
+          'Content-Type: multipart/related; boundary="' . $frontiere . '"; type="multipart/alternative"';
+        $envoye = mail($email, $sujet, $corps, $entetes);
+      }
+      if (!$envoye) {
+        error_log('Merise Studio : échec de l’envoi d’un code de réinitialisation.');
+        $bd->prepare('DELETE FROM password_reset_codes WHERE utilisateur_id=? AND code_hash=?')->execute([$utilisateurId, $hashCode]);
+      }
+    } else {
+      error_log('Merise Studio : MAIL_FROM_ADDRESS invalide, code de réinitialisation non envoyé.');
+      $bd->prepare('DELETE FROM password_reset_codes WHERE utilisateur_id=? AND code_hash=?')->execute([$utilisateurId, $hashCode]);
+    }
+  }
+  rep(['ok' => true, 'message' => $message]);
+}
+if ($action === 'password_reset_confirm') {
+  $email = strtolower(trim($in['email'] ?? ''));
+  $code = $in['code'] ?? '';
+  $nouveau = $in['nouveau'] ?? '';
+  if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !is_string($code) || !preg_match('/^\d{6}$/D', $code)) {
+    err('Adresse e-mail ou code invalide');
+  }
+  if (!motDePasseValide($nouveau)) err('Le nouveau mot de passe doit faire 12 caractères min. (72 octets max.)');
+
+  $s = $bd->prepare('SELECT u.id, r.code_hash, r.tentatives, (r.expire_le <= NOW()) AS expire
+                     FROM utilisateurs u
+                     JOIN password_reset_codes r ON r.utilisateur_id=u.id
+                     WHERE LOWER(u.email)=? AND u.actif=1 LIMIT 1');
+  $s->execute([$email]);
+  $reset = $s->fetch();
+  if (!$reset || (int)$reset['tentatives'] >= 5 || (int)$reset['expire'] === 1) {
+    if ($reset) $bd->prepare('DELETE FROM password_reset_codes WHERE utilisateur_id=?')->execute([$reset['id']]);
+    err('Code invalide ou expiré. Demandez un nouveau code.', 400);
+  }
+  if (!password_verify($code, $reset['code_hash'])) {
+    $bd->prepare('UPDATE password_reset_codes SET tentatives=tentatives+1 WHERE utilisateur_id=?')->execute([$reset['id']]);
+    err('Code invalide ou expiré. Demandez un nouveau code.', 400);
+  }
+
+  $bd->beginTransaction();
+  $bd->prepare('UPDATE utilisateurs SET mot_de_passe=? WHERE id=?')->execute([hacherMotDePasse($nouveau), $reset['id']]);
+  $bd->prepare('DELETE FROM sessions WHERE utilisateur_id=?')->execute([$reset['id']]);
+  $bd->prepare('DELETE FROM password_reset_codes WHERE utilisateur_id=?')->execute([$reset['id']]);
+  journal($bd, (int)$reset['id'], 'mot_de_passe_reinitialise');
+  $bd->commit();
+  rep(['ok' => true]);
 }
 if ($action === 'contact') {
   $nom = trim($in['nom'] ?? ''); $email = strtolower(trim($in['email'] ?? ''));

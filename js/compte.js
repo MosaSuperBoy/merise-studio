@@ -28,10 +28,14 @@
       (erreur ? '<p class="erreur">' + esc(erreur) + '</p>' : '') +
       '<button class="primaire">' + (ins ? 'Créer mon compte' : 'Se connecter') + '</button>' +
       '<button type="button" data-a="bascule">' + (ins ? 'J\'ai déjà un compte' : 'Créer un compte') + '</button>' +
-      (ins ? '' : '<p class="aide">Mot de passe oublié ? Contactez l’administrateur.</p>') +
+      (ins ? '' : '<button type="button" data-a="oubli">Mot de passe oublié ?</button>') +
       '<button type="button" data-fermer>Fermer</button></form>');
     var d = $('#dlg');
-    d.onclick = function (e) { if (e.target.closest('[data-fermer]')) d.close(); if (e.target.closest('[data-a=bascule]')) vueConnexion(ins ? 'login' : 'register', null, info); };
+    d.onclick = function (e) {
+      if (e.target.closest('[data-fermer]')) d.close();
+      if (e.target.closest('[data-a=bascule]')) vueConnexion(ins ? 'login' : 'register', null, info);
+      if (e.target.closest('[data-a=oubli]')) vueResetRequest(info);
+    };
     $('#fAuth').onsubmit = async function (e) {
       e.preventDefault();
       var f = Object.fromEntries(new FormData(e.target));
@@ -43,6 +47,48 @@
         majBouton();
         if (apres) { var f = apres; apres = null; d.close(); E.toast('Connecté.'); f(); } else vueCompte();
       } catch (x) { vueConnexion(mode, x.message, info); }
+    };
+  }
+
+  function vueResetRequest(info, erreur) {
+    E.dlg('<h2>Mot de passe oublié</h2>' +
+      (info ? '<p class="aide">' + esc(info) + '</p>' : '') +
+      '<form id="fResetRequest"><input name="email" type="email" placeholder="Adresse e-mail du compte" required autocomplete="email">' +
+      (erreur ? '<p class="erreur">' + esc(erreur) + '</p>' : '') +
+      '<button class="primaire">Envoyer un code</button><button type="button" data-a="retour-login">Retour à la connexion</button></form>');
+    var d = $('#dlg');
+    d.onclick = function (e) { if (e.target.closest('[data-a=retour-login]')) vueConnexion('login', null, info); };
+    $('#fResetRequest').onsubmit = async function (e) {
+      e.preventDefault();
+      var email = new FormData(e.target).get('email');
+      try {
+        var r = await appel('password_reset_request', { email: email });
+        vueResetConfirm(email, r.message);
+      } catch (x) { vueResetRequest(info, x.message); }
+    };
+  }
+
+  function vueResetConfirm(email, info, erreur) {
+    E.dlg('<h2>Réinitialiser le mot de passe</h2>' +
+      (info ? '<p class="aide">' + esc(info) + '</p>' : '') +
+      '<form id="fResetConfirm"><input name="email" type="email" value="' + esc(email) + '" required autocomplete="email">' +
+      '<input name="code" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="Code à 6 chiffres" required autocomplete="one-time-code">' +
+      '<input name="nouveau" type="password" minlength="12" maxlength="72" placeholder="Nouveau mot de passe (12 caractères min.)" required autocomplete="new-password">' +
+      (erreur ? '<p class="erreur">' + esc(erreur) + '</p>' : '') +
+      '<button class="primaire">Réinitialiser</button><button type="button" data-a="retour-reset">Renvoyer un code</button>' +
+      '<button type="button" data-a="retour-login">Retour à la connexion</button></form>');
+    var d = $('#dlg');
+    d.onclick = function (e) {
+      if (e.target.closest('[data-a=retour-reset]')) vueResetRequest();
+      if (e.target.closest('[data-a=retour-login]')) vueConnexion('login');
+    };
+    $('#fResetConfirm').onsubmit = async function (e) {
+      e.preventDefault();
+      var f = Object.fromEntries(new FormData(e.target));
+      try {
+        await appel('password_reset_confirm', f);
+        vueConnexion('login', null, 'Votre mot de passe a été réinitialisé. Vous pouvez vous connecter.');
+      } catch (x) { vueResetConfirm(email, info, x.message); }
     };
   }
 

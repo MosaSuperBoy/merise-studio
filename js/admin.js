@@ -102,9 +102,11 @@
           '</label>' +
           '<button class="primaire" type="submit" style="margin-top:.4rem;padding:.7rem;">Se connecter à l\'espace admin</button>' +
         '</form>' +
+        '<p style="text-align:center;"><button type="button" id="bMdpOublieAdmin">Mot de passe oublié ?</button></p>' +
         '<p style="text-align:center;margin-top:1.5rem;"><a href="index.html" class="btn" style="text-decoration:none;">← Retour au site public</a> <a href="editeur.html" class="btn primaire" style="text-decoration:none;">Ouvrir l\'Éditeur</a></p>' +
       '</div>';
 
+    $('#bMdpOublieAdmin').onclick = function () { vueResetAdmin(); };
     $('#fLoginAdmin').onsubmit = async function (e) {
       e.preventDefault();
       var data = Object.fromEntries(new FormData(e.target));
@@ -120,6 +122,48 @@
         toast('Bienvenue dans l\'espace administrateur.');
       } catch (err) {
         vueLogin(err.message);
+      }
+    };
+  }
+
+  function vueResetAdmin(mode, email, erreur, info) {
+    mode = mode || 'request';
+    email = email || '';
+    var demande = mode === 'request';
+    $('#adminApp').innerHTML =
+      '<div class="auth-box">' +
+        '<h1>' + (demande ? 'Mot de passe oublié' : 'Réinitialiser le mot de passe') + '</h1>' +
+        (info ? '<p class="intro">' + esc(info) + '</p>' : '') +
+        (erreur ? '<p class="erreur" style="background:#fde8e8;padding:.6rem .8rem;border-radius:8px;">' + esc(erreur) + '</p>' : '') +
+        '<form id="fResetAdmin">' +
+          '<label>Adresse e-mail du compte' +
+            '<input name="email" type="email" required autocomplete="email" value="' + esc(email) + '">' +
+          '</label>' +
+          (demande ? '' :
+            '<label>Code à 6 chiffres' +
+              '<input name="code" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" required autocomplete="one-time-code">' +
+            '</label>' +
+            '<label>Nouveau mot de passe (12 caractères min.)' +
+              '<input name="nouveau" type="password" minlength="12" maxlength="72" required autocomplete="new-password">' +
+            '</label>') +
+          '<button class="primaire" type="submit">' + (demande ? 'Envoyer un code' : 'Réinitialiser le mot de passe') + '</button>' +
+        '</form>' +
+        '<p style="text-align:center;"><button type="button" id="bRetourLoginAdmin">Retour à la connexion</button></p>' +
+      '</div>';
+    $('#bRetourLoginAdmin').onclick = function () { vueLogin(); };
+    $('#fResetAdmin').onsubmit = async function (e) {
+      e.preventDefault();
+      var data = Object.fromEntries(new FormData(e.target));
+      try {
+        if (demande) {
+          var r = await appel('password_reset_request', data);
+          vueResetAdmin('confirm', data.email, null, r.message);
+        } else {
+          await appel('password_reset_confirm', data);
+          vueLogin('Mot de passe réinitialisé. Vous pouvez vous connecter.');
+        }
+      } catch (err) {
+        vueResetAdmin(mode, email || data.email, err.message, info);
       }
     };
   }

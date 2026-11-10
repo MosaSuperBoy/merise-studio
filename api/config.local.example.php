@@ -5,3 +5,4 @@ const DB_NOM = 'your-database-name';
 const DB_UTILISATEUR = 'your-database-username';
 const DB_MOT_DE_PASSE = 'replace-with-your-database-password';
 const SESSION_JOURS = 30;
+const MAIL_FROM_ADDRESS = 'no-reply@example.com';

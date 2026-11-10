@@ -57,6 +57,18 @@ CREATE TABLE IF NOT EXISTS sessions (
   INDEX idx_sess_expire (expire_le)
 ) ENGINE=InnoDB;
 
+-- Codes de réinitialisation de mot de passe (hachés, temporaires et à usage unique)
+CREATE TABLE IF NOT EXISTS password_reset_codes (
+  utilisateur_id  INT UNSIGNED PRIMARY KEY,
+  code_hash       VARCHAR(255) NOT NULL,
+  tentatives      TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  expire_le       DATETIME NOT NULL,
+  cree_le         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_reset_user FOREIGN KEY (utilisateur_id)
+    REFERENCES utilisateurs(id) ON DELETE CASCADE,
+  INDEX idx_reset_expire (expire_le)
+) ENGINE=InnoDB;
+
 -- Désactive les installations qui utilisent encore le mot de passe administrateur publié.
 UPDATE utilisateurs
 SET actif = 0
