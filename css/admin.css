@@ -644,6 +644,8 @@ html.sombre .badge-type {
   display: inline-flex !important;
   visibility: visible !important;
   opacity: 1 !important;
+  flex: 0 0 auto;
+  white-space: nowrap;
   background: linear-gradient(135deg, var(--orange), var(--orange2)) !important;
   color: #fff !important;
   font-weight: 800;
@@ -671,4 +673,44 @@ html.sombre .badge-type {
   color: #fff;
   font-weight: 700;
   box-shadow: 0 0 0 2px #fff6;
+}
+
+/* Mouvement visible et maîtrisé pour le tableau de bord */
+.admin-header{animation:ms-admin-header-in .58s cubic-bezier(.2,.75,.25,1) both}
+.admin-conteneur{animation:ms-admin-content-in .68s cubic-bezier(.2,.7,.25,1) both}
+.admin-onglet-btn{transition:transform .2s cubic-bezier(.2,.7,.25,1),background-color .24s ease,color .24s ease,box-shadow .24s ease}
+.admin-onglet-btn:hover{transform:translateY(-3px) scale(1.015)}
+.admin-onglet-btn.actif{box-shadow:inset 0 -4px 0 var(--orange),0 5px 14px rgba(15,107,58,.12);animation:ms-admin-tab-active .44s cubic-bezier(.2,.7,.25,1) both}
+.admin-conteneur>.admin-onglets{animation:ms-admin-tabs-in .58s cubic-bezier(.2,.7,.25,1) .12s both}
+.stat-carte{transition:transform .3s cubic-bezier(.2,.7,.25,1),box-shadow .3s ease,border-color .3s ease}
+.stats-grille .stat-carte{animation:ms-admin-card-in .68s cubic-bezier(.2,.7,.25,1) both}
+.stats-grille .stat-carte:nth-child(2){animation-delay:110ms}
+.stats-grille .stat-carte:nth-child(3){animation-delay:220ms}
+.stats-grille .stat-carte:nth-child(4){animation-delay:330ms}
+.stats-grille .stat-carte::before{transform:scaleX(0);transform-origin:left;animation:ms-admin-accent-in .62s cubic-bezier(.2,.7,.25,1) .3s both}
+#contenuOnglet.ms-onglet-visible{animation:ms-admin-panel-in .66s cubic-bezier(.2,.7,.25,1) both}
+#contenuOnglet.ms-onglet-visible .barre-outils-admin,
+#contenuOnglet.ms-onglet-visible .maintenance-dashboard{animation:ms-admin-section-in .58s cubic-bezier(.2,.7,.25,1) .08s both}
+#contenuOnglet.ms-onglet-visible .table-responsive{animation:ms-admin-section-in .58s cubic-bezier(.2,.7,.25,1) .14s both}
+#contenuOnglet.ms-onglet-visible .table-admin tbody tr:nth-child(-n+8){animation:ms-admin-row-in .42s cubic-bezier(.2,.7,.25,1) both}
+#contenuOnglet.ms-onglet-visible .table-admin tbody tr:nth-child(2){animation-delay:45ms}
+#contenuOnglet.ms-onglet-visible .table-admin tbody tr:nth-child(3){animation-delay:90ms}
+#contenuOnglet.ms-onglet-visible .table-admin tbody tr:nth-child(4){animation-delay:135ms}
+#contenuOnglet.ms-onglet-visible .table-admin tbody tr:nth-child(5){animation-delay:180ms}
+#contenuOnglet.ms-onglet-visible .table-admin tbody tr:nth-child(6){animation-delay:225ms}
+#contenuOnglet.ms-onglet-visible .table-admin tbody tr:nth-child(7){animation-delay:270ms}
+#contenuOnglet.ms-onglet-visible .table-admin tbody tr:nth-child(8){animation-delay:315ms}
+.table-admin td{transition:background-color .18s ease}
+@media(hover:hover){.admin-onglet-btn:hover{box-shadow:0 7px 16px rgba(15,107,58,.14)}.stat-carte:hover{transform:translateY(-6px) scale(1.015);border-color:#a8d8b9;box-shadow:0 15px 30px rgba(15,107,58,.17)}}
+@keyframes ms-admin-header-in{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ms-admin-content-in{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ms-admin-card-in{from{opacity:0;transform:translateY(18px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes ms-admin-panel-in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ms-admin-tabs-in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ms-admin-tab-active{from{transform:translateY(3px) scale(.96)}to{transform:translateY(0) scale(1)}}
+@keyframes ms-admin-section-in{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ms-admin-row-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ms-admin-accent-in{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }

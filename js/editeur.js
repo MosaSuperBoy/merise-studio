@@ -20,10 +20,11 @@
     ovale: ['Ovale', 'ellipse', '#ffffff', '#f28c1b', 140, 70],
     losange: ['Losange', 'diamond', '#ffffff', '#157a40', 130, 80],
     fleche: ['Flèche', 'arrow', '#fff1e0', '#f28c1b', 160, 50],
+    trait: ['Trait', 'line', 'none', '#157a40', 140, 2],
     texte: ['Zone de texte', 'text', 'none', 'none', 140, 40]
   };
   var TYPES = {
-    MCD: ['entite', 'association', 'heritage', 'contrainte'], MLD: ['table'], MCC: ['acteur', 'message', 'fleche'],
+    MCD: ['entite', 'association', 'heritage', 'contrainte', 'trait'], MLD: ['table'], MCC: ['acteur', 'message', 'fleche'],
     MCT: ['evenement', 'operation', 'synchro'], MOT: ['poste', 'operation'],
     LIBRE: ['forme', 'ovale', 'losange', 'fleche', 'texte']
   };
@@ -52,6 +53,13 @@
   function refaire() { if (!redo.length) return; undo.push(snap()); appliquer(redo.pop()); maj(); }
   function noeud(id) { return doc.nodes.filter(function (n) { return n.id === id; })[0]; }
   function lien(id) { return doc.links.filter(function (l) { return l.id === id; })[0]; }
+  function normaliserTraits() {
+    doc.nodes.forEach(function (n) {
+      if (n.kind !== 'trait') return;
+      if (typeof n.x2 !== 'number') n.x2 = n.x + 140;
+      if (typeof n.y2 !== 'number') n.y2 = n.y;
+    });
+  }
   function idsN() { return Array.from(sel).filter(function (i) { return i[0] === 'n'; }); }
   function idsL() { return Array.from(sel).filter(function (i) { return i[0] === 'l'; }); }
 
@@ -105,6 +113,7 @@
   function hex(v) { return /^#[0-9a-f]{6}$/i.test(v) ? v : '#ffffff'; }
   function lignes(n) { return n.details ? n.details.split('\n').filter(Boolean) : []; }
   function taille(n) {
+    if (n.kind === 'trait') return [Math.max(1, Math.abs((+n.x2 || 0) - n.x)), Math.max(1, Math.abs((+n.y2 || 0) - n.y))];
     var k = KINDS[n.kind] || ['Élément', 'rect', '#e8f7ee', '#1f9d55', 160, 60];
     var f = k[1], w = k[4], h = k[5], l = lignes(n);
     var y = sn(n), r = y.fs / 15;
@@ -134,9 +143,23 @@
     }
     return [w, h];
   }
+  function boiteNoeud(n) {
+    if (n.kind === 'trait') {
+      return {
+        x: Math.min(n.x, +n.x2 || 0), y: Math.min(n.y, +n.y2 || 0),
+        w: Math.max(1, Math.abs((+n.x2 || 0) - n.x)), h: Math.max(1, Math.abs((+n.y2 || 0) - n.y))
+      };
+    }
+    var t = taille(n);
+    return { x: n.x, y: n.y, w: t[0], h: t[1] };
+  }
+  function deplacerNoeud(n, dx, dy) {
+    n.x += dx; n.y += dy;
+    if (n.kind === 'trait') { n.x2 = (+n.x2 || 0) + dx; n.y2 = (+n.y2 || 0) + dy; }
+  }
   // Point où la droite centre → p traverse le contour de l'élément
   function bord(n, p) {
-    var t = taille(n), w = t[0], h = t[1], cx = n.x + w / 2, cy = n.y + h / 2, dx = p.x - cx, dy = p.y - cy;
+    var b = boiteNoeud(n), w = b.w, h = b.h, cx = b.x + w / 2, cy = b.y + h / 2, dx = p.x - cx, dy = p.y - cy;
     if (!dx && !dy) return { x: cx, y: cy };
     var f = (KINDS[n.kind] || [])[1], k;
     if (f === 'ellipse') k = 1 / Math.sqrt(Math.pow(dx / (w / 2), 2) + Math.pow(dy / (h / 2), 2));
@@ -162,6 +185,35 @@
     var t = brut == null ? '' : String(brut);
     return t.charAt(0) === '#' || (t.charAt(0) === '_' && t.charAt(t.length - 1) === '_' && t.length > 2);
   }
+  function detailsVisibles(n) {
+    return String(n.details || '').split('\n').map(function (ligne) { return ligne.replace(/^#/, ''); }).join('\n');
+  }
+  function detailsAvecCles(n, valeur) {
+    var ancien = String(n.details || '').split('\n');
+    return String(valeur).split('\n').map(function (ligne, idx) {
+      var cle = ligne.charAt(0) === '#' || (ancien[idx] || '').charAt(0) === '#';
+      ligne = ligne.replace(/^#/, '');
+      return cle ? '#' + ligne : ligne;
+    }).join('\n');
+  }
+  function indexTexteCible(n) {
+    return idsN().length === 1 && !idsL().length && ligneSel && ligneSel.texte && ligneSel.id === n.id
+      ? ligneSel.idx : null;
+  }
+  function styleTexteCible(n) {
+    var style = sn(n), idx = indexTexteCible(n);
+    if (idx !== null) Object.assign(style, n.style && n.style.lignes && n.style.lignes[String(idx)] || {});
+    return style;
+  }
+  function appTexte(fn) {
+    var ns = idsN(), idx = ns.length === 1 ? indexTexteCible(noeud(ns[0])) : null;
+    if (idx === null) return appN(fn);
+    var n = noeud(ns[0]);
+    n.style = n.style || {};
+    n.style.lignes = n.style.lignes || {};
+    var style = n.style.lignes[String(idx)] = n.style.lignes[String(idx)] || {};
+    fn(style, n);
+  }
   function ligneEstSoulignee(n, idx, brut) {
     var marks = n.style && n.style.lignesU;
     if (marks && Object.prototype.hasOwnProperty.call(marks, String(idx))) return !!marks[String(idx)];
@@ -170,9 +222,18 @@
   }
   function poserTexte(g, n, idx, brut, at) {
     var visible = texteVisible(brut);
+    var styleLigne = n && n.style && n.style.lignes && n.style.lignes[String(idx)];
+    if (styleLigne) {
+      at = Object.assign({}, at);
+      if (styleLigne.font) at['font-family'] = styleLigne.font + ',Arial,sans-serif';
+      if (styleLigne.tc) at.fill = styleLigne.tc;
+      if (styleLigne.fs) at['font-size'] = styleLigne.fs;
+      if (styleLigne.b !== undefined) at['font-weight'] = styleLigne.b ? 'bold' : 'normal';
+      if (styleLigne.i !== undefined) at['font-style'] = styleLigne.i ? 'italic' : 'normal';
+    }
     var node = texte(Object.assign({ 'data-ligne': String(idx), 'class': 'ligne-texte' }, at), g, visible || ' ');
     var bb = node.getBBox();
-    if (ligneSel && n && ligneSel.id === n.id && ligneSel.idx === idx) {
+    if (ligneSel && ligneSel.texte && n && ligneSel.id === n.id && ligneSel.idx === idx) {
       var hi = el('rect', {
         x: bb.x - 3, y: bb.y - 1, width: Math.max(8, bb.width + 6), height: bb.height + 3,
         fill: '#f28c1b33', rx: 3, 'pointer-events': 'none'
@@ -236,8 +297,8 @@
     doc.links.forEach(function (l) {
       var a = noeud(l.from), b = noeud(l.to);
       if (!a || !b) return;
-      var ta = taille(a), tb = taille(b), st = sl(l), s = sel.has(l.id);
-      var ca = { x: a.x + ta[0] / 2, y: a.y + ta[1] / 2 }, cb = { x: b.x + tb[0] / 2, y: b.y + tb[1] / 2 };
+      var ba = boiteNoeud(a), bb = boiteNoeud(b), st = sl(l), s = sel.has(l.id);
+      var ca = { x: ba.x + ba.w / 2, y: ba.y + ba.h / 2 }, cb = { x: bb.x + bb.w / 2, y: bb.y + bb.h / 2 };
       var p = bord(a, cb), q = bord(b, ca);
       var g = el('g', { 'data-id': l.id, 'class': 'lien' }, svg);
       if (s) el('line', { x1: p.x, y1: p.y, x2: q.x, y2: q.y, stroke: '#f28c1b', 'stroke-opacity': 0.4, 'stroke-width': st.w + 8 }, g);
@@ -272,7 +333,21 @@
     });
     doc.nodes.forEach(function (n) {
       var k = KINDS[n.kind] || ['Élément', 'rect', '#e8f7ee', '#1f9d55', 160, 60], f = k[1], t = taille(n), w = t[0], h = t[1], s = sel.has(n.id), l = lignes(n), y = sn(n), r = y.fs / 15;
-      var g = el('g', { transform: 'translate(' + n.x + ',' + n.y + ')', 'data-id': n.id, 'class': 'noeud' }, svg);
+      var g = el('g', { transform: 'translate(' + n.x + ',' + n.y + ')', 'data-id': n.id, 'class': n.kind === 'trait' ? 'noeud noeud-trait' : 'noeud' }, svg);
+      if (n.kind === 'trait') {
+        var dx = (+n.x2 || 0) - n.x, dy = (+n.y2 || 0) - n.y;
+        var lineStyle = { stroke: y.sw <= 0 || y.stroke === 'none' ? 'transparent' : y.stroke, 'stroke-width': Math.max(1, y.sw), 'stroke-linecap': 'round' };
+        var lineDash = dashAttr(y.dash);
+        if (lineDash) lineStyle['stroke-dasharray'] = lineDash;
+        if (s) el('line', { x1: 0, y1: 0, x2: dx, y2: dy, stroke: '#f28c1b', 'stroke-opacity': 0.35, 'stroke-width': Math.max(9, y.sw + 8), 'stroke-linecap': 'round', 'pointer-events': 'none' }, g);
+        el('line', Object.assign({ x1: 0, y1: 0, x2: dx, y2: dy }, lineStyle), g);
+        el('line', { x1: 0, y1: 0, x2: dx, y2: dy, stroke: 'transparent', 'stroke-width': 18, 'stroke-linecap': 'round' }, g);
+        if (s) {
+          el('circle', { cx: 0, cy: 0, r: 7, fill: '#fff', stroke: '#d96a00', 'stroke-width': 2, 'class': 'trait-poignee', 'data-endpoint': 'start' }, g);
+          el('circle', { cx: dx, cy: dy, r: 7, fill: '#fff', stroke: '#d96a00', 'stroke-width': 2, 'class': 'trait-poignee', 'data-endpoint': 'end' }, g);
+        }
+        return;
+      }
       var st = {
         fill: (y.fill === 'none' || y.fill === 'transparent') ? 'transparent' : y.fill,
         stroke: (y.sw <= 0 || y.stroke === 'none' || y.stroke === 'transparent') ? 'none' : y.stroke,
@@ -367,7 +442,10 @@
     var i = doc.nodes.length, id = 'n' + (++doc.seq);
     var libelle = KINDS[kind][0];
     if (kind === 'contrainte') libelle = 'X';
-    doc.nodes.push({ id: id, kind: kind, x: 60 + (i * 40) % 500, y: 60 + (i * 40) % 350, label: libelle, details: '' });
+    var x = 60 + (i * 40) % 500, y = 60 + (i * 40) % 350;
+    var node = { id: id, kind: kind, x: x, y: y, label: libelle, details: '' };
+    if (kind === 'trait') { node.x2 = x + 140; node.y2 = y; }
+    doc.nodes.push(node);
     ligneSel = { id: id, idx: -1 };
     sel.clear(); sel.add(id); maj();
   }
@@ -380,7 +458,7 @@
   function dupliquer() {
     var n = idsN(); if (!n.length) return;
     avant(); var map = {};
-    n.forEach(function (id) { var o = noeud(id), c = JSON.parse(JSON.stringify(o)); c.id = 'n' + (++doc.seq); c.x += 30; c.y += 30; map[id] = c.id; doc.nodes.push(c); });
+    n.forEach(function (id) { var o = noeud(id), c = JSON.parse(JSON.stringify(o)); c.id = 'n' + (++doc.seq); deplacerNoeud(c, 30, 30); map[id] = c.id; doc.nodes.push(c); });
     doc.links.slice().forEach(function (l) {
       if (!map[l.from] || !map[l.to]) return;
       var c = JSON.parse(JSON.stringify(l));
@@ -517,10 +595,14 @@
     var hasDetails = n1 && (f1 === 'rect' || f1 === 'round' || f1 === 'text' || n1.kind === 'association');
 
     if (ns.length === 1 && !ls.length) {
+      if (n1.kind === 'trait') {
+        h += '<p class="aide">Faites glisser une extrémité du trait pour le rallonger ou changer son orientation.</p>';
+      } else {
       h += '<label>Nom / Libellé<input id="fLabel"></label>' +
-        (hasDetails ? '<label>Attributs / Contenu (un par ligne)<textarea id="fDet"></textarea></label><p class="aide">Préfixez un identifiant avec <code>#</code> (ex. <code>#id_client</code>) : seule cette ligne est soulignée. Cliquez ensuite le nom ou une ligne, puis Souligné, pour ne changer que cette ligne.</p>' : '') +
+        (hasDetails ? '<label>Attributs / Contenu (un par ligne)<textarea id="fDet"></textarea></label><p class="aide">Cliquez sur le nom ou une ligne dans le diagramme pour la sélectionner. Les outils de typographie s’appliquent à cette ligne. Sélectionnez une ligne puis cochez « Clé primaire » pour la souligner sans saisir de #.</p>' : '') +
         (n1.kind === 'contrainte' ? '<p class="aide">Contrainte (comme dans Looping)</p><div class="cardin" id="bContr">' +
           ['X', 'T', 'XT', 'I', '+', 'CIF'].map(function (c) { return '<button type="button" data-k="' + c + '">' + c + '</button>'; }).join('') + '</div>' : '');
+      }
     } else if (ls.length === 1 && !ns.length) {
       h += '<label>Texte du lien (ex. 0,N)<input id="fLien"></label><p class="aide">Cardinalités</p><div class="cardin" id="bCardin">' +
         ['0,1', '0,N', '1,1', '1,N'].map(function (card) { return '<button type="button" data-c="' + card + '">' + card + '</button>'; }).join('') + '</div>';
@@ -532,20 +614,29 @@
 
     if (n1) {
       var y = sn(n1);
+      if (n1.kind === 'trait') {
+        h += '<h3>Style du trait</h3>' +
+          cC('sStroke', 'Couleur', y.stroke === 'none' || y.stroke === 'transparent' ? '#157a40' : y.stroke) +
+          cR('sSw', 'Épaisseur', y.sw, 1, 12, 'px') +
+          cSelect('sDash', 'Style', [
+            ['none', 'Continu ─────'], ['pointille', 'Pointillés ·····'], ['tiret', 'Tirets - - -'], ['dashdot', 'Tiret-point -·-·-']
+          ], y.dash);
+      } else {
+      var ty = styleTexteCible(n1);
       var idxU = (ligneSel && ligneSel.id === n1.id) ? ligneSel.idx : -1;
       var brutU = idxU < 0 ? n1.label : (lignes(n1)[idxU] || '');
       var uCible = ligneEstSoulignee(n1, idxU, brutU);
       var cibleU = idxU < 0 ? 'le nom « ' + texteVisible(n1.label) + ' »' : 'la ligne « ' + texteVisible(brutU) + ' »';
       h += '<h3>Texte & Typographie' + (ns.length > 1 ? ' (' + ns.length + ')' : '') + '</h3>' +
-        cF('sFont', 'Police', y.font) +
-        cR('sFs', 'Taille du texte', y.fs, 10, 36, 'px') +
-        cC('sTc', 'Couleur du texte', y.tc) +
+        cF('sFont', 'Police', ty.font) +
+        cR('sFs', 'Taille du texte', ty.fs, 10, 36, 'px') +
+        cC('sTc', 'Couleur du texte', ty.tc) +
         '<div class="groupe-boutons">' +
-          '<button type="button" id="bToggleB" class="btn-b' + (y.b ? ' actif' : '') + '" title="Gras (Ctrl+B)">Gras</button>' +
-          '<button type="button" id="bToggleI" class="btn-i' + (y.i ? ' actif' : '') + '" title="Italique (Ctrl+I)">Italique</button>' +
+          '<button type="button" id="bToggleB" class="btn-b' + (ty.b ? ' actif' : '') + '" title="Gras (Ctrl+B)">Gras</button>' +
+          '<button type="button" id="bToggleI" class="btn-i' + (ty.i ? ' actif' : '') + '" title="Italique (Ctrl+I)">Italique</button>' +
           '<button type="button" id="bToggleU" class="btn-u' + (uCible ? ' actif' : '') + '" title="Souligner seulement la ligne cliquée (Ctrl+U)"><u>Souligné</u></button>' +
         '</div>' +
-        '<p class="aide">Cible du soulignement : ' + cibleU + '.</p>' +
+        '<p class="aide">Cible du soulignement : ' + cibleU + '. Cliquez directement sur un texte du diagramme pour appliquer police, taille, couleur, gras et italique à cette seule ligne.</p>' +
         '<div class="ligneS" style="display:flex;align-items:center;justify-content:space-between;gap:.6rem;font-size:.9rem;margin-top:.3rem;">' +
           '<span>Alignement</span>' +
           '<div class="groupe-boutons" style="margin:0;flex:1;max-width:180px;">' +
@@ -594,6 +685,7 @@
           '<button type="button" id="bFondTransp" class="btn-petit">Fond transparent</button>' +
         '</div>' +
         '<p><button id="bTous">Appliquer à tous les éléments du même type</button> <button id="bRazN">Réinitialiser le style</button></p>';
+      }
     }
 
     if (l1) {
@@ -644,6 +736,7 @@
 
     // Événements éléments
     if (ns.length === 1 && !ls.length) {
+      if (n1.kind !== 'trait') {
       $('#fLabel').value = n1.label;
       lie('#fLabel', function (v) { n1.label = v || ' '; });
       var contr = $('#bContr');
@@ -655,8 +748,8 @@
         sauverLocal(); dessiner();
       };
       if (hasDetails) {
-        $('#fDet').value = n1.details || '';
-        lie('#fDet', function (v) { n1.details = v; });
+        $('#fDet').value = detailsVisibles(n1);
+        lie('#fDet', function (v) { n1.details = detailsAvecCles(n1, v); });
       }
       if (hasDetails && ligneSel && ligneSel.id === n1.id && ligneSel.idx >= 0) {
         function sauverProprietesAttribut() {
@@ -672,6 +765,7 @@
         ['#sAttrNom', '#sAttrType', '#sAttrNotNull', '#sAttrUnique', '#sAttrPrimary'].forEach(function (id) {
           $(id).addEventListener('change', sauverProprietesAttribut);
         });
+      }
       }
     }
 
@@ -690,9 +784,14 @@
     }
 
     if (n1) {
-      lie('#sFont', function (v) { appN(function (s) { s.font = v; }); });
-      lie('#sFs', function (v) { appN(function (s) { s.fs = v; }); }, 'px');
-      lie('#sTc', function (v) { appN(function (s) { s.tc = v; }); });
+      if (n1.kind === 'trait') {
+        lie('#sStroke', function (v) { appN(function (s) { s.stroke = v; }); });
+        lie('#sSw', function (v) { appN(function (s) { s.sw = v; }); }, 'px');
+        lie('#sDash', function (v) { appN(function (s) { s.dash = v; }); });
+      } else {
+      lie('#sFont', function (v) { appTexte(function (s) { s.font = v; }); });
+      lie('#sFs', function (v) { appTexte(function (s) { s.fs = v; }); }, 'px');
+      lie('#sTc', function (v) { appTexte(function (s) { s.tc = v; }); });
       lie('#sW', function (v) { appN(function (s) { s.w = v; }); }, 'px');
       lie('#sH', function (v) { appN(function (s) { s.h = v; }); }, 'px');
       lie('#sStroke', function (v) { appN(function (s) { s.stroke = v; }); });
@@ -705,15 +804,15 @@
       var bB = $('#bToggleB');
       if (bB) bB.onclick = function () {
         avant();
-        var nv = !sn(n1).b;
-        appN(function (s) { s.b = nv; });
+        var nv = !styleTexteCible(n1).b;
+        appTexte(function (s) { s.b = nv; });
         maj();
       };
       var bI = $('#bToggleI');
       if (bI) bI.onclick = function () {
         avant();
-        var nv = !sn(n1).i;
-        appN(function (s) { s.i = nv; });
+        var nv = !styleTexteCible(n1).i;
+        appTexte(function (s) { s.i = nv; });
         maj();
       };
       var bU = $('#bToggleU');
@@ -766,6 +865,7 @@
         ns.forEach(function (i) { delete noeud(i).style; });
         maj();
       };
+      }
     }
 
     if (l1) {
@@ -861,30 +961,114 @@
     var c = e.target.closest('[data-id]'), m = multi || e.shiftKey || e.ctrlKey;
     if (!c) { if (!m) { sel.clear(); ligneSel = null; dessiner(); panneau(); } return; }
     var id = c.getAttribute('data-id');
+    var endpoint = e.target.closest('[data-endpoint]');
+    if (endpoint && id.charAt(0) === 'n' && noeud(id).kind === 'trait') {
+      if (m) sel.add(id);
+      else if (!sel.has(id)) { sel.clear(); sel.add(id); }
+      ligneSel = null;
+      var pe = pos(e);
+      var cote = endpoint.getAttribute('data-endpoint'), traitInitial = noeud(id);
+      drag = {
+        mode: 'endpoint',
+        id: id,
+        endpoint: cote,
+        x: pe.x,
+        y: pe.y,
+        ox: cote === 'start' ? traitInitial.x : +traitInitial.x2,
+        oy: cote === 'start' ? traitInitial.y : +traitInitial.y2,
+        avant: snap(),
+        bouge: false
+      };
+      try { svg.setPointerCapture(e.pointerId); } catch (x) {}
+      dessiner(); panneau();
+      return;
+    }
     var ligneEl = e.target.closest('[data-ligne]');
     if (m) { if (sel.has(id)) sel.delete(id); else sel.add(id); }
     else if (!sel.has(id)) { sel.clear(); sel.add(id); }
     if (id.charAt(0) === 'n') {
-      ligneSel = { id: id, idx: ligneEl ? parseInt(ligneEl.getAttribute('data-ligne'), 10) : -1 };
+      ligneSel = { id: id, idx: ligneEl ? parseInt(ligneEl.getAttribute('data-ligne'), 10) : -1, texte: !!ligneEl };
     } else ligneSel = null;
-    if (id[0] === 'n' && !m) { var p = pos(e); drag = { x: p.x, y: p.y, avant: snap(), bouge: false }; try { svg.setPointerCapture(e.pointerId); } catch (x) {} }
+    if (id[0] === 'n' && !m) {
+      var p = pos(e);
+      drag = {
+        x: p.x,
+        y: p.y,
+        positions: idsN().map(function (i) {
+          var n = noeud(i);
+          return { id: i, x: n.x, y: n.y, x2: n.kind === 'trait' ? +n.x2 : null, y2: n.kind === 'trait' ? +n.y2 : null };
+        }),
+        avant: snap(),
+        bouge: false
+      };
+      try { svg.setPointerCapture(e.pointerId); } catch (x) {}
+    }
     dessiner(); panneau();
   });
+  function appliquerDeplacement() {
+    if (!drag || !drag.pointeur) return;
+    var p = pos(drag.pointeur);
+    if (drag.mode === 'endpoint') {
+      var distance = Math.abs(p.x - drag.x) + Math.abs(p.y - drag.y);
+      if (!drag.bouge && distance < 3) return;
+      var dxExt = p.x - drag.x, dyExt = p.y - drag.y;
+      if (grille) {
+        dxExt = Math.round(dxExt / 24) * 24;
+        dyExt = Math.round(dyExt / 24) * 24;
+      }
+      var point = { x: Math.max(0, drag.ox + dxExt), y: Math.max(0, drag.oy + dyExt) };
+      var trait = noeud(drag.id);
+      if (!trait) return;
+      if (drag.endpoint === 'start') { trait.x = point.x; trait.y = point.y; }
+      else { trait.x2 = point.x; trait.y2 = point.y; }
+      drag.bouge = true;
+      dessiner();
+      return;
+    }
+    var dx = p.x - drag.x, dy = p.y - drag.y;
+    if (!drag.bouge && Math.abs(dx) + Math.abs(dy) < 3) return;
+    drag.bouge = true;
+    (drag.positions || []).forEach(function (origine) {
+      var n = noeud(origine.id);
+      if (!n) return;
+      var nx = Math.max(0, origine.x + dx), ny = Math.max(0, origine.y + dy);
+      if (n.kind === 'trait') {
+        var dxReel = nx - origine.x, dyReel = ny - origine.y;
+        n.x = nx;
+        n.y = ny;
+        n.x2 = origine.x2 + dxReel;
+        n.y2 = origine.y2 + dyReel;
+      } else {
+        n.x = nx;
+        n.y = ny;
+      }
+    });
+    dessiner();
+  }
   svg.addEventListener('pointermove', function (e) {
     if (!drag) return;
-    var p = pos(e), dx = p.x - drag.x, dy = p.y - drag.y;
-    if (!drag.bouge && Math.abs(dx) + Math.abs(dy) < 3) return;
-    drag.bouge = true; drag.x = p.x; drag.y = p.y;
-    idsN().forEach(function (i) { var n = noeud(i); n.x = Math.max(0, n.x + dx); n.y = Math.max(0, n.y + dy); });
-    dessiner();
+    drag.pointeur = { clientX: e.clientX, clientY: e.clientY };
+    if (drag.frame) return;
+    drag.frame = window.requestAnimationFrame(function () {
+      if (!drag) return;
+      drag.frame = 0;
+      appliquerDeplacement();
+    });
   });
   function accrocher(n) {
     if (!grille) return;
-    n.x = Math.round(n.x / 24) * 24; n.y = Math.round(n.y / 24) * 24;
+    var x = Math.round(n.x / 24) * 24, y = Math.round(n.y / 24) * 24;
+    deplacerNoeud(n, x - n.x, y - n.y);
   }
-  function fin() {
+  function fin(e) {
+    if (drag && e && typeof e.clientX === 'number') {
+      drag.pointeur = { clientX: e.clientX, clientY: e.clientY };
+      if (drag.frame) window.cancelAnimationFrame(drag.frame);
+      drag.frame = 0;
+      appliquerDeplacement();
+    }
     if (drag && drag.bouge) {
-      idsN().forEach(function (i) { accrocher(noeud(i)); });
+      if (drag.mode !== 'endpoint') idsN().forEach(function (i) { accrocher(noeud(i)); });
       undo.push(drag.avant); redo = []; maj();
     }
     drag = null;
@@ -906,16 +1090,16 @@
       e.preventDefault();
       if (!idsN().length) return;
       avant();
-      var nvB = !sn(noeud(idsN()[0])).b;
-      idsN().forEach(function (i) { var n = noeud(i); n.style = n.style || {}; n.style.b = nvB; });
+      var nvB = !styleTexteCible(noeud(idsN()[0])).b;
+      appTexte(function (s) { s.b = nvB; });
       maj();
     }
     else if (cmd && k === 'i') {
       e.preventDefault();
       if (!idsN().length) return;
       avant();
-      var nvI = !sn(noeud(idsN()[0])).i;
-      idsN().forEach(function (i) { var n = noeud(i); n.style = n.style || {}; n.style.i = nvI; });
+      var nvI = !styleTexteCible(noeud(idsN()[0])).i;
+      appTexte(function (s) { s.i = nvI; });
       maj();
     }
   });
@@ -931,27 +1115,27 @@
   function setZoom(z) { zoom = Math.min(2.5, Math.max(0.4, z)); appliquerVue(); }
   function ajuster() {
     if (!doc.nodes.length) { setZoom(1); return; }
-    var x2 = 0, y2 = 0;
-    doc.nodes.forEach(function (n) { var t = taille(n); x2 = Math.max(x2, n.x + t[0]); y2 = Math.max(y2, n.y + t[1]); });
+    var x1 = 0, y1 = 0, x2 = 1, y2 = 1;
+    doc.nodes.forEach(function (n) { var b = boiteNoeud(n); x1 = Math.min(x1, b.x); y1 = Math.min(y1, b.y); x2 = Math.max(x2, b.x + b.w); y2 = Math.max(y2, b.y + b.h); });
     var box = svg.parentElement.getBoundingClientRect();
-    var z = Math.min((box.width - 24) / (x2 + 80), (box.height - 60) / (y2 + 80), 1.5);
+    var z = Math.min((box.width - 24) / (x2 - x1 + 80), (box.height - 60) / (y2 - y1 + 80), 1.5);
     setZoom(z);
   }
   function aligner(mode) {
     var ns = idsN(); if (ns.length < 2) { toast('Sélectionnez au moins deux éléments.'); return; }
     avant();
-    var items = ns.map(function (i) { var n = noeud(i), t = taille(n); return { n: n, w: t[0], h: t[1] }; });
-    if (mode === 'g') { var x = Math.min.apply(null, items.map(function (i) { return i.n.x; })); items.forEach(function (i) { i.n.x = x; }); }
-    if (mode === 'd') { var r = Math.max.apply(null, items.map(function (i) { return i.n.x + i.w; })); items.forEach(function (i) { i.n.x = r - i.w; }); }
+    var items = ns.map(function (i) { var n = noeud(i), b = boiteNoeud(n); return { n: n, x: b.x, y: b.y, w: b.w, h: b.h }; });
+    if (mode === 'g') { var x = Math.min.apply(null, items.map(function (i) { return i.x; })); items.forEach(function (i) { deplacerNoeud(i.n, x - i.x, 0); }); }
+    if (mode === 'd') { var r = Math.max.apply(null, items.map(function (i) { return i.x + i.w; })); items.forEach(function (i) { deplacerNoeud(i.n, r - i.w - i.x, 0); }); }
     if (mode === 'c') {
-      var cx = items.reduce(function (s, i) { return s + i.n.x + i.w / 2; }, 0) / items.length;
-      items.forEach(function (i) { i.n.x = cx - i.w / 2; });
+      var cx = items.reduce(function (s, i) { return s + i.x + i.w / 2; }, 0) / items.length;
+      items.forEach(function (i) { deplacerNoeud(i.n, cx - i.w / 2 - i.x, 0); });
     }
-    if (mode === 'h') { var y = Math.min.apply(null, items.map(function (i) { return i.n.y; })); items.forEach(function (i) { i.n.y = y; }); }
-    if (mode === 'b') { var bas = Math.max.apply(null, items.map(function (i) { return i.n.y + i.h; })); items.forEach(function (i) { i.n.y = bas - i.h; }); }
+    if (mode === 'h') { var y = Math.min.apply(null, items.map(function (i) { return i.y; })); items.forEach(function (i) { deplacerNoeud(i.n, 0, y - i.y); }); }
+    if (mode === 'b') { var bas = Math.max.apply(null, items.map(function (i) { return i.y + i.h; })); items.forEach(function (i) { deplacerNoeud(i.n, 0, bas - i.h - i.y); }); }
     if (mode === 'm') {
-      var cy = items.reduce(function (s, i) { return s + i.n.y + i.h / 2; }, 0) / items.length;
-      items.forEach(function (i) { i.n.y = cy - i.h / 2; });
+      var cy = items.reduce(function (s, i) { return s + i.y + i.h / 2; }, 0) / items.length;
+      items.forEach(function (i) { deplacerNoeud(i.n, 0, cy - i.h / 2 - i.y); });
     }
     maj();
   }
@@ -968,7 +1152,7 @@
     if (!presse || !presse.nodes.length) { toast('Presse-papiers vide.'); return; }
     avant(); var map = {};
     presse.nodes.forEach(function (o) {
-      var c = JSON.parse(JSON.stringify(o)); c.id = 'n' + (++doc.seq); c.x += 36; c.y += 36; map[o.id] = c.id; doc.nodes.push(c);
+      var c = JSON.parse(JSON.stringify(o)); c.id = 'n' + (++doc.seq); deplacerNoeud(c, 36, 36); map[o.id] = c.id; doc.nodes.push(c);
     });
     presse.links.forEach(function (l) {
       var c = JSON.parse(JSON.stringify(l));
@@ -1100,7 +1284,7 @@
         liensIgnorables++;
       }
     });
-    var noeudsIgnorables = source.nodes.filter(function (n) { return n.kind !== 'entite' && n.kind !== 'association'; }).length;
+    var noeudsIgnorables = source.nodes.filter(function (n) { return n.kind !== 'entite' && n.kind !== 'association' && n.kind !== 'trait'; }).length;
     return {
       type: 'MLD', titre: (source.titre || 'Sans titre') + ' — MLD', seq: seq,
       nodes: nodes, links: links, trash: [], noeudsIgnorables: noeudsIgnorables, liensIgnorables: liensIgnorables
@@ -1262,7 +1446,7 @@
   function dictionnaire() {
     if (!doc.nodes.length) { toast('Le diagramme est vide.'); return; }
     var txt = 'Dictionnaire de données — ' + (doc.titre || 'Sans titre') + '\nType : ' + (TITRES[doc.type] || doc.type) + '\n\n';
-    doc.nodes.forEach(function (n) {
+    doc.nodes.filter(function (n) { return n.kind !== 'trait'; }).forEach(function (n) {
       txt += KINDS[n.kind][0] + ' : ' + n.label + '\n';
       lignes(n).forEach(function (l) { txt += '  - ' + l + '\n'; });
       txt += '\n';
@@ -1350,8 +1534,8 @@
   function svgExport() {
     if (!doc.nodes.length) { toast('Le diagramme est vide.'); return null; }
     var old = sel; sel = new Set(); dessiner();
-    var x1 = 1e9, y1 = 1e9, x2 = 0, y2 = 0;
-    doc.nodes.forEach(function (n) { var t = taille(n); x1 = Math.min(x1, n.x); y1 = Math.min(y1, n.y); x2 = Math.max(x2, n.x + t[0]); y2 = Math.max(y2, n.y + t[1]); });
+    var x1 = 1e9, y1 = 1e9, x2 = -1e9, y2 = -1e9;
+    doc.nodes.forEach(function (n) { var b = boiteNoeud(n); x1 = Math.min(x1, b.x); y1 = Math.min(y1, b.y); x2 = Math.max(x2, b.x + b.w); y2 = Math.max(y2, b.y + b.h); });
     var c = svg.cloneNode(true), w = x2 - x1 + 60, h = y2 - y1 + 60;
     c.setAttribute('xmlns', NS); c.setAttribute('viewBox', (x1 - 30) + ' ' + (y1 - 30) + ' ' + w + ' ' + h);
     c.setAttribute('width', w); c.setAttribute('height', h); c.removeAttribute('style');
@@ -1399,6 +1583,7 @@
   function ouvrirDoc(o) {
     if (!o || !Array.isArray(o.nodes)) { toast('Fichier invalide.'); return; }
     doc = Object.assign(nouveau(), o); doc.links = doc.links || []; doc.trash = doc.trash || [];
+    normaliserTraits();
     undo = []; redo = []; sel.clear(); ligneSel = null; $('#titre').value = doc.titre; $('#type').value = doc.type; palette(); maj();
   }
 
@@ -1417,6 +1602,7 @@
   try { doc = JSON.parse(localStorage.getItem('ms_doc')); } catch (e) { doc = null; }
   if (!doc || !Array.isArray(doc.nodes)) doc = nouveau();
   doc.links = doc.links || []; doc.trash = doc.trash || [];
+  normaliserTraits();
   $('#titre').value = doc.titre; $('#type').value = doc.type;
   $('#titre').addEventListener('input', function (e) { doc.titre = e.target.value; sauverLocal(); });
   $('#type').addEventListener('change', function (e) { doc.type = e.target.value; palette(); sauverLocal(); });

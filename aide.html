@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#0f6b3a">
 <title>Aide — Merise Studio</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=9">
 </head>
 <body data-page="aide.html">
 <main id="contenu" class="page texte">
@@ -25,6 +25,7 @@
   </ul>
 
   <h2>Construire un diagramme</h2>
+  <p>Dans un MCD, ajoutez un <strong>Trait</strong> depuis la palette puis faites glisser ses poignées pour l’allonger ou changer son orientation. Déplacez une extrémité indépendamment pour placer le trait entre les éléments.</p>
   <ol>
     <li>Cliquez sur un bouton de la palette <em>Ajouter</em>.</li>
     <li>Glissez l’élément. Touchez-le pour changer son nom et ses attributs (un par ligne).</li>
@@ -34,7 +35,7 @@
 
   <h2>Outils de l’éditeur</h2>
   <ul>
-    <li><strong>Style et typographie</strong> — police, taille, couleurs, gras, italique, alignement. Le <u>soulignement</u> (Ctrl+U) ne concerne que la ligne cliquée : le nom de l’entité, ou un seul attribut. Un identifiant préfixé par <code>#</code> est souligné seul.</li>
+    <li><strong>Style et typographie</strong> — cliquez directement sur le nom ou une ligne dans le diagramme pour la sélectionner, puis choisissez police, taille, couleur, gras, italique ou soulignement (Ctrl+U). La mise en forme du texte ne touche que la ligne sélectionnée; les autres réglages s’appliquent à l’élément sélectionné. Pour une clé primaire, cochez « Clé primaire » dans les propriétés de l’attribut : aucun <code>#</code> n’est nécessaire ou affiché.</li>
     <li><strong>Zone de texte et dimensions</strong> — réglage précis de la largeur et hauteur (curseurs ou ajustement auto), fond transparent ou coloré.</li>
     <li><strong>Traits et bordures</strong> — épaisseur réglable (0 à 12 px), styles continu, pointillés, tirets ou tiret-point, coins arrondis.</li>
     <li><strong>Flèches et liaisons</strong> — direction (fin, début, deux bouts, aucune), forme (triangle plein, ouverte en V, losange plein/vide, rond) et taille ajustable.</li>
@@ -63,15 +64,15 @@
       <tr><td>Ctrl+Z / Ctrl+Y</td><td>Annuler / Rétablir</td></tr>
       <tr><td>Ctrl+A</td><td>Tout sélectionner</td></tr>
       <tr><td>Ctrl+C / Ctrl+V / Ctrl+D</td><td>Copier / Coller / Dupliquer</td></tr>
-      <tr><td>Ctrl+U</td><td>Souligner seulement la ligne cliquée (nom ou attribut)</td></tr>
-      <tr><td>Ctrl+B / Ctrl+I</td><td>Gras / Italique</td></tr>
+      <tr><td>Ctrl+U</td><td>Souligner la ligne cliquée (nom ou attribut)</td></tr>
+      <tr><td>Ctrl+B / Ctrl+I</td><td>Gras / Italique sur la ligne cliquée, ou sur l’élément sélectionné</td></tr>
       <tr><td>Suppr</td><td>Supprimer la sélection</td></tr>
       <tr><td>Maj+clic</td><td>Ajouter à la sélection</td></tr>
     </tbody>
   </table>
   <p class="cta"><a class="btn primaire" href="editeur.html">Ouvrir l’éditeur</a></p>
 </main>
-<script src="js/site.js"></script>
+<script src="js/site.js?v=3"></script>
 <script src="js/maintenance.js"></script>
 </body>
 </html>

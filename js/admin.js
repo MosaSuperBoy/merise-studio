@@ -298,8 +298,16 @@
   }
 
   // --- Chargement selon l'onglet ---
+  function animerOnglet(zone) {
+    zone.classList.remove('ms-onglet-visible');
+    window.requestAnimationFrame(function () {
+      if (document.getElementById('contenuOnglet') === zone) zone.classList.add('ms-onglet-visible');
+    });
+  }
+
   async function chargerOnglet(nom) {
     var zone = $('#contenuOnglet');
+    zone.classList.remove('ms-onglet-visible');
     zone.innerHTML = '<p class="aide">Chargement des données en cours…</p>';
 
     try {
@@ -310,8 +318,10 @@
       else if (nom === 'journal') await afficherJournal(zone);
       else if (nom === 'moncompte') await afficherMonCompte(zone);
       else if (nom === 'maintenance') await afficherOngletMaintenance(zone);
+      animerOnglet(zone);
     } catch (err) {
       zone.innerHTML = '<p class="erreur">Erreur : ' + esc(err.message) + '</p>';
+      animerOnglet(zone);
     }
   }
 

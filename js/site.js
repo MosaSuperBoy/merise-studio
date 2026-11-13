@@ -54,11 +54,32 @@
       '</div><p class="copy">© ' + new Date().getFullYear() + ' Merise Studio · Projet éducatif</p>';
     document.body.appendChild(footer);
 
-    document.getElementById('bMenu').onclick = function () {
-      var n = document.getElementById('navSite');
-      var o = n.classList.toggle('ouvert');
-      this.setAttribute('aria-expanded', o ? 'true' : 'false');
+    var bMenu = document.getElementById('bMenu');
+    var nav = document.getElementById('navSite');
+    var menuQuery = window.matchMedia('(max-width: 720px)');
+    function definirMenuOuvert(ouvert, rendreFocus) {
+      nav.classList.toggle('ouvert', ouvert);
+      bMenu.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
+      bMenu.textContent = ouvert ? 'Fermer' : 'Menu';
+      nav.setAttribute('aria-hidden', menuQuery.matches && !ouvert ? 'true' : 'false');
+      if (!ouvert && rendreFocus) bMenu.focus();
+    }
+    bMenu.onclick = function () {
+      definirMenuOuvert(!nav.classList.contains('ouvert'), false);
     };
+    nav.addEventListener('click', function (e) {
+      if (e.target.closest('a')) definirMenuOuvert(false, false);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && nav.classList.contains('ouvert')) definirMenuOuvert(false, true);
+    });
+    function adapterMenuAuViewport(e) {
+      if (!e.matches) definirMenuOuvert(false, false);
+      else nav.setAttribute('aria-hidden', nav.classList.contains('ouvert') ? 'false' : 'true');
+    }
+    if (typeof menuQuery.addEventListener === 'function') menuQuery.addEventListener('change', adapterMenuAuViewport);
+    else if (typeof menuQuery.addListener === 'function') menuQuery.addListener(adapterMenuAuViewport);
+    definirMenuOuvert(false, false);
     themeInit();
   }
 
@@ -75,6 +96,29 @@
         b.textContent = s ? 'Clair' : 'Sombre';
       };
     }
+  }
+
+  function animerContenu() {
+    var requeteMouvementReduit = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (requeteMouvementReduit && requeteMouvementReduit.matches) return;
+    if (!('IntersectionObserver' in window)) return;
+
+    var cibles = document.querySelectorAll('.page > *');
+    if (!cibles.length) return;
+
+    var observateur = new IntersectionObserver(function (entrees) {
+      entrees.forEach(function (entree) {
+        if (!entree.isIntersecting) return;
+        entree.target.classList.add('ms-visible');
+        observateur.unobserve(entree.target);
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+
+    Array.prototype.forEach.call(cibles, function (cible, index) {
+      cible.style.setProperty('--ms-reveal-delay', Math.min(index % 4, 3) * 65 + 'ms');
+      cible.classList.add('ms-reveal');
+      observateur.observe(cible);
+    });
   }
 
   function contact() {
@@ -102,8 +146,8 @@
     };
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { injecter(); contact(); });
-  else { injecter(); contact(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { injecter(); contact(); animerContenu(); });
+  else { injecter(); contact(); animerContenu(); }
 
   window.MS = { esc: esc, themeInit: themeInit };
 })();
