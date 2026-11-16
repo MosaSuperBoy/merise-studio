@@ -150,8 +150,10 @@ button:not(:disabled):active,a.btn:active{transform:translateY(0) scale(.98)}
 input,select,textarea{transition:border-color var(--transition-rapide),box-shadow var(--transition-rapide)}
 input:focus,select:focus,textarea:focus{border-color:var(--vert);box-shadow:0 0 0 3px #1f9d5520;outline:0}
 .site-barre{animation:ms-entree-haut .58s cubic-bezier(.2,.75,.25,1) both}
-.ms-reveal{opacity:0;transform:translateY(22px);transition:opacity .58s cubic-bezier(.2,.7,.25,1),transform .62s cubic-bezier(.2,.7,.25,1);transition-delay:var(--ms-reveal-delay,0ms)}
+.ms-reveal{opacity:0;transform:translateY(18px);transition:opacity .68s cubic-bezier(.2,.7,.25,1),transform .68s cubic-bezier(.2,.7,.25,1);transition-delay:var(--ms-reveal-delay,0ms)}
 .ms-reveal.ms-visible{opacity:1;transform:translateY(0)}
+.page .cartes article.ms-reveal{transform:translateY(18px) scale(.98)}
+.page .cartes article.ms-reveal.ms-visible{transform:translateY(0) scale(1)}
 .site-nav a{transition:transform var(--transition-rapide),background-color var(--transition-douce)}
 .marque .logo{transition:transform .32s cubic-bezier(.2,.7,.25,1)}
 .app .barre{animation:ms-entree-haut .55s cubic-bezier(.2,.75,.25,1) both}
@@ -166,7 +168,7 @@ dialog[open]::backdrop{animation:ms-fondu .22s ease-out both}
 @media(hover:hover){
   .site-nav a:hover{transform:translateY(-2px)}
   .marque:hover .logo{transform:rotate(-10deg) scale(1.06)}
-  .cartes article:hover{transform:translateY(-5px) scale(1.01);border-color:#a8d8b9;box-shadow:0 14px 30px #0f6b3a20}
+  .cartes article:hover,.page .cartes article.ms-visible:hover{transform:translateY(-5px) scale(1.01);border-color:#a8d8b9;box-shadow:0 14px 30px #0f6b3a20}
   .site-pied a:hover{opacity:1;transform:translateX(4px)}
 }
 @keyframes ms-entree-haut{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:translateY(0)}}

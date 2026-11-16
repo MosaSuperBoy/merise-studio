@@ -4,14 +4,14 @@ Site complet pour dessiner des diagrammes MERISE (MCD, MLD, MCC, MCT, MOT, dessi
 
 ## Installation
 1. Copiez le dossier `merise-studio` sur votre serveur (XAMPP/WAMP : `htdocs`, ou votre hébergeur PHP 7.4+).
-2. Modifiez `api/config.php` avec vos accès MySQL.
+2. Configurez les accès MySQL dans `api/config.local.php`, à partir de `api/config.local.example.php`.
 3. **Rien à importer** : la base et les tables se créent automatiquement au premier lancement (schéma intégré dans `db/merise_studio.sql`). Si votre hébergeur interdit la création de bases, créez une base vide dans phpMyAdmin avec le nom indiqué dans `config.php` : les tables se créeront seules. Import manuel possible : `mysql -u root -p < db/merise_studio.sql`.
 4. Ouvrez `http://localhost/merise-studio/` (pas en double-cliquant sur les fichiers : PHP doit tourner pour le compte, l’enregistrement et le contact).
-5. Sur une nouvelle installation, créez votre compte avec **Compte** : le premier compte créé devient administrateur. Faites cette première inscription depuis votre machine locale ou protégez temporairement le site par un accès restreint avant de le rendre public.
+5. Sur une nouvelle installation, créez le compte destiné à l’administration pendant que le site est protégé. L’inscription publique crée toujours un compte utilisateur standard. Promouvez ensuite ce compte depuis phpMyAdmin avec `UPDATE utilisateurs SET role='admin' WHERE email='votre-adresse@example.com';` en remplaçant l’adresse par celle du compte.
 6. Connectez-vous ensuite à l’**Espace Administrateur** (`admin.html`) et utilisez un mot de passe unique d’au moins 12 caractères. Aucun compte ni mot de passe administrateur par défaut n’est créé.
 7. Pour permettre la réinitialisation du mot de passe par e-mail, configurez l’envoi de courriels PHP sur le serveur et ajoutez à `api/config.local.php` une ligne `const MAIL_FROM_ADDRESS = 'no-reply@votre-domaine.tld';` avec une adresse d’expédition valide pour votre domaine. Si ce fichier existe déjà, ajoutez seulement cette ligne sans remplacer vos paramètres MySQL. Le courriel contient le logo du site, le code à 6 chiffres expire après 15 minutes et est limité à 5 tentatives.
 
-Sur une base déjà installée, l’ancien compte administrateur préconfiguré est automatiquement désactivé au prochain appel de l’API. S’il ne reste aucun administrateur actif, le prochain compte inscrit devient administrateur. Les mots de passe existants restent utilisables jusqu’à leur changement.
+Sur une base déjà installée, l’ancien compte administrateur préconfiguré est désactivé au prochain appel de l’API. Une inscription publique ne rétablit jamais les droits admin. Si aucun administrateur actif ne reste, réactivez ou promouvez un compte directement dans la base, depuis un accès de confiance.
 
 ## Pages du site
 - Accueil (`index.html`), Éditeur (`editeur.html`), Espace Administrateur (`admin.html`), Aide (`aide.html`), À propos (`a-propos.html`), Contact (`contact.html`), Mentions légales (`mentions.html`), Confidentialité (`confidentialite.html`), Page 404 (`404.html`).
@@ -19,7 +19,7 @@ Sur une base déjà installée, l’ancien compte administrateur préconfiguré 
 ## Utilisation de l’éditeur
 - **Ajouter** un élément, glisser pour le déplacer, toucher pour modifier son nom et ses attributs.
 - **Relier & Flèches** : activer « Sélection multiple », toucher 2 éléments, puis « Relier ». Flèches personnalisables (vers la fin, vers le début, aux deux bouts, aucune), formes (triangle plein, ouverte en V, losange plein/vide, rond) et tailles réglables.
-- **Style & Personnalisation** : texte souligné (Ctrl+U), gras (Ctrl+B), italique (Ctrl+I), alignement (gauche, centre, droite), zone de texte réglable en largeur et hauteur manuelles ou automatiques, fond transparent ou coloré, traits et bordures en continu, pointillés, tirets ou tiret-point. Préfixe <code>#</code> pour souligner automatiquement les clés primaires en Merise.
+- **Style & Personnalisation** : cliquez sur le nom ou une ligne du diagramme pour appliquer police, taille, couleur, gras, italique et soulignement (Ctrl+U) uniquement à ce texte ; les réglages de l’élément restent disponibles en sélectionnant sa forme. Les clés primaires se définissent avec la case « Clé primaire », sans préfixe <code>#</code> visible. Alignement (gauche, centre, droite), zone de texte réglable en largeur et hauteur manuelles ou automatiques, fond transparent ou coloré, traits et bordures en continu, pointillés, tirets ou tiret-point.
 - **Disposition** : zoom, grille, ajuster, aligner. **Copier / coller** : Ctrl+C / Ctrl+V.
 - **Attributs MCD/MLD** : sélectionnez une ligne d’attribut pour définir son type de données, sa clé primaire, `NOT NULL` et `UNIQUE`. Les lignes existantes sans type gardent leur libellé et prennent `VARCHAR(255)` lors de la génération SQL.
 - **Merise** : convertir un MCD en MLD (clés étrangères selon les cardinalités, tables de jonction pour les associations plusieurs-à-plusieurs), générer du SQL pour MySQL/MariaDB, PostgreSQL, SQLite ou SQL Server, consulter le dictionnaire et charger des exemples.
@@ -30,15 +30,15 @@ Sur une base déjà installée, l’ancien compte administrateur préconfiguré 
 - **Compte** : profil, mot de passe, diagrammes, corbeille.
 - **Espace Administrateur (`admin.html`)** : tableau de bord complet, métriques et KPIs, gestion des comptes utilisateurs (création, modification, activation/désactivation, suppression, réinitialisation de mot de passe), activation/désactivation du mode maintenance global depuis le tableau de bord, l’en-tête ou **Mon compte**, surveillance de tous les diagrammes, consultation et traitement des messages de contact et journal d'audit.
 
-Sécurité : les nouveaux mots de passe doivent contenir au moins 12 caractères (72 octets maximum). Utilisez un mot de passe unique, configurez un compte MySQL dédié avec un mot de passe non vide en production, et mettez le site en HTTPS.
+Sécurité : mots de passe de 12 caractères minimum, sessions limitées à 7 jours par défaut, limites anti-abus sur les routes publiques et requêtes API plafonnées à 6 Mio. Apache force HTTPS pour les hôtes publics et applique CSP, anti-cadrage, anti-MIME-sniffing et politique de référent. Configurez un compte MySQL dédié, un mot de passe non vide et vérifiez que HTTPS est opérationnel sur votre hébergeur.
 
 ## Hébergement gratuit PHP/MySQL (InfinityFree)
 1. Créez vous-même un compte gratuit sur [InfinityFree](https://dash.infinityfree.com/register) et choisissez un sous-domaine gratuit. L'inscription ne nécessite pas de carte bancaire. GitHub Pages n'exécute pas PHP.
 2. Dans le panneau de contrôle de l'hébergeur, créez une base MySQL et notez son hôte, son nom, son utilisateur et son mot de passe. Ces valeurs sont fournies par l'hébergeur : elles ne sont généralement pas `localhost` / `root`.
-3. Copiez `api/config.local.example.php` vers `api/config.local.php`, remplacez les valeurs par celles de votre panneau, puis envoyez le fichier `config.local.php` au serveur. Il est ignoré par Git et protégé contre l'accès Web. Ne le publiez jamais sur GitHub et ne partagez pas son contenu.
+3. Copiez `api/config.local.example.php` vers `api/config.local.php`, remplacez les valeurs par celles de votre panneau, puis envoyez le fichier `config.local.php` au serveur. Il est ignoré par Git et protégé contre l’accès Web. Ne le publiez jamais sur GitHub et ne partagez pas son contenu. La durée de session par défaut est de 7 jours.
 4. Envoyez le contenu du projet dans le dossier `htdocs` avec le gestionnaire de fichiers ou FTP; ne téléversez ni `.git` ni le dossier parent. Conservez les fichiers et sous-dossiers (`api`, `css`, `db`, `js`).
 5. Activez le certificat SSL gratuit dans le panneau et vérifiez que le site s'ouvre en `https://` avant toute inscription ou saisie de mot de passe.
-6. Après avoir configuré la base, ouvrez le site et créez immédiatement le premier compte administrateur avant de partager son adresse. Vérifiez ensuite une inscription utilisateur, une connexion et l'enregistrement d'un diagramme.
+6. Créez d’abord le compte utilisateur destiné à l’administration, promouvez-le depuis phpMyAdmin avec la requête indiquée à l’étape 5, puis partagez l’adresse du site. Vérifiez ensuite une inscription, une connexion et l’enregistrement d’un diagramme.
 
 **Mise à jour d'un site déjà en ligne :** remplacez les fichiers du projet mais **conservez `api/config.local.php`** (il n'est jamais dans le zip). S'il a été supprimé, l'API répond « Fichier api/config.local.php introuvable » : recréez-le à partir de `api/config.local.example.php`. Les tables facultatives (contact, codes de réinitialisation, maintenance) sont créées automatiquement et ne bloquent plus le site si l'une d'elles ne peut pas l'être ; le détail de l'erreur est alors écrit dans le journal d'erreurs PHP de l'hébergeur.
 

@@ -2,6 +2,37 @@
 // API de Merise Studio : comptes, diagrammes et administration (JSON via POST)
 require __DIR__ . '/config.php';
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, private');
+header('X-Content-Type-Options: nosniff');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+$hoteRequete = strtolower(preg_replace('/:\d+$/', '', $_SERVER['HTTP_HOST'] ?? ''));
+$hotesLocaux = ['localhost', '127.0.0.1', '::1', '[::1]'];
+$httpsActif = (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off')
+  || strtolower($_SERVER['REQUEST_SCHEME'] ?? '') === 'https'
+  || (int)($_SERVER['SERVER_PORT'] ?? 0) === 443;
+if (PHP_SAPI !== 'cli' && !in_array($hoteRequete, $hotesLocaux, true) && !$httpsActif) {
+  http_response_code(403);
+  echo json_encode(['erreur' => 'HTTPS est obligatoire pour utiliser cette API.'], JSON_UNESCAPED_UNICODE);
+  exit;
+}
+if (PHP_SAPI !== 'cli' && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+  header('Allow: POST');
+  http_response_code(405);
+  echo json_encode(['erreur' => 'Cette API accepte uniquement les requêtes POST.'], JSON_UNESCAPED_UNICODE);
+  exit;
+}
+$typeContenu = strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '')[0]));
+if (PHP_SAPI !== 'cli' && $typeContenu !== 'application/json') {
+  http_response_code(415);
+  echo json_encode(['erreur' => 'Le corps de requête doit être au format JSON.'], JSON_UNESCAPED_UNICODE);
+  exit;
+}
+$tailleMaxCorps = 6 * 1024 * 1024;
+if ((int)($_SERVER['CONTENT_LENGTH'] ?? 0) > $tailleMaxCorps) {
+  http_response_code(413);
+  echo json_encode(['erreur' => 'Requête trop volumineuse'], JSON_UNESCAPED_UNICODE);
+  exit;
+}
 
 // Toute erreur inattendue renvoie du JSON propre au lieu d'une page blanche
 set_exception_handler(function ($e) { error_log('Merise Studio : ' . $e->getMessage()); http_response_code(500); echo json_encode(['erreur' => 'Erreur serveur'], JSON_UNESCAPED_UNICODE); });
@@ -57,6 +88,12 @@ function tableFacultative($bd, $sql, $sqlSecours = null) {
   }
   return false;
 }
+$rateLimitDisponible = tableFacultative($bd, "CREATE TABLE IF NOT EXISTS api_rate_limits (
+    bucket CHAR(64) PRIMARY KEY,
+    window_started DATETIME NOT NULL,
+    attempts INT UNSIGNED NOT NULL DEFAULT 1,
+    INDEX idx_rate_window (window_started)
+  ) ENGINE=InnoDB");
 tableFacultative($bd, "CREATE TABLE IF NOT EXISTS messages (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     nom VARCHAR(100) NOT NULL,
@@ -91,6 +128,40 @@ if (tableFacultative($bd, "CREATE TABLE IF NOT EXISTS site_settings (
   catch (Throwable $e) { error_log('Merise Studio : réglage maintenance non initialisé : ' . $e->getMessage()); }
 }
 
+function limiterRequetes($bd, $actionLimitee, $maximum, $fenetreSecondes) {
+  global $rateLimitDisponible;
+  if (!$rateLimitDisponible) err('Protection anti-abus temporairement indisponible.', 503);
+
+  $ip = $_SERVER['REMOTE_ADDR'] ?? 'inconnue';
+  if (!filter_var($ip, FILTER_VALIDATE_IP)) $ip = 'inconnue';
+  $bucket = hash('sha256', $actionLimitee . "\0" . $ip);
+  $fenetreSecondes = max(1, (int)$fenetreSecondes);
+  $conditionFenetre = "window_started <= DATE_SUB(NOW(), INTERVAL $fenetreSecondes SECOND)";
+
+  try {
+    $s = $bd->prepare("INSERT INTO api_rate_limits(bucket,window_started,attempts) VALUES(?,NOW(),1)
+      ON DUPLICATE KEY UPDATE
+        attempts=IF($conditionFenetre,1,attempts+1),
+        window_started=IF($conditionFenetre,NOW(),window_started)");
+    $s->execute([$bucket]);
+    $s = $bd->prepare('SELECT attempts FROM api_rate_limits WHERE bucket=?');
+    $s->execute([$bucket]);
+    $tentatives = (int)$s->fetchColumn();
+  } catch (Throwable $e) {
+    error_log('Merise Studio : limitation des requêtes indisponible : ' . $e->getMessage());
+    err('Protection anti-abus temporairement indisponible.', 503);
+  }
+
+  if (random_int(1, 100) === 1) {
+    try { $bd->exec('DELETE FROM api_rate_limits WHERE window_started < DATE_SUB(NOW(), INTERVAL 1 DAY)'); }
+    catch (Throwable $e) { error_log('Merise Studio : nettoyage des limites impossible : ' . $e->getMessage()); }
+  }
+  if ($tentatives > (int)$maximum) {
+    header('Retry-After: ' . $fenetreSecondes);
+    err('Trop de requêtes. Réessayez plus tard.', 429);
+  }
+}
+
 // Désactive les installations qui utilisent encore le mot de passe administrateur publié.
 try {
   $hashRootParDefaut = '$2y$12$39eevJ5B5Mdbg.cZT1zEaOvtR72aD..rHRdU4kbehbZBVEQZ9icVS';
@@ -100,7 +171,12 @@ try {
   error_log('Merise Studio : contrôle du compte root impossible : ' . $e->getMessage());
 }
 
-$in = json_decode(file_get_contents('php://input'), true) ?: [];
+$flux = fopen('php://input', 'rb');
+$corps = $flux ? stream_get_contents($flux, $tailleMaxCorps + 1) : '';
+if ($flux) fclose($flux);
+if (strlen($corps) > $tailleMaxCorps) err('Requête trop volumineuse', 413);
+$in = json_decode($corps, true);
+if (!is_array($in)) $in = [];
 $action = $_GET['action'] ?? '';
 try { $maintenanceActive = (string)$bd->query("SELECT setting_value FROM site_settings WHERE setting_key='maintenance'")->fetchColumn() === '1'; }
 catch (Throwable $e) { $maintenanceActive = false; } // table des réglages indisponible : le site reste ouvert
@@ -123,19 +199,21 @@ function connecte($bd) {
 // --- Actions publiques ---
 if ($action === 'maintenance_status') rep(['actif' => $maintenanceActive]);
 if ($action === 'register') {
+  limiterRequetes($bd, 'register', 8, 3600);
   if ($maintenanceActive) err('Le site est en maintenance. Réessayez plus tard.', 503);
   $nom = trim($in['nom'] ?? ''); $email = strtolower(trim($in['email'] ?? '')); $mdp = $in['mot_de_passe'] ?? '';
   if ($nom === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || !motDePasseValide($mdp)) err('Nom, e-mail valide et mot de passe (12 caractères min., 72 octets max.) requis');
   if (strtolower($nom) === 'root') err('Le nom de connexion « root » est réservé à l\'administrateur', 400);
   $s = $bd->prepare('SELECT id FROM utilisateurs WHERE email=? OR LOWER(nom)=?'); $s->execute([$email, strtolower($nom)]);
   if ($s->fetch()) err('Cet e-mail ou nom d\'utilisateur est déjà utilisé', 409);
-  // Si aucun admin n'existe encore, ce compte devient admin
-  $role = $bd->query("SELECT COUNT(*) c FROM utilisateurs WHERE role='admin' AND actif=1")->fetch()['c'] == 0 ? 'admin' : 'utilisateur';
+  // L'inscription publique ne peut jamais attribuer les droits administrateur.
+  $role = 'utilisateur';
   $bd->prepare('INSERT INTO utilisateurs(nom,email,mot_de_passe,role) VALUES(?,?,?,?)')->execute([$nom, $email, hacherMotDePasse($mdp), $role]);
   $id = (int)$bd->lastInsertId(); journal($bd, $id, 'inscription');
   rep(['jeton' => ouvrirSession($bd, $id), 'utilisateur' => ['id' => $id, 'nom' => $nom, 'email' => $email, 'role' => $role]]);
 }
 if ($action === 'login') {
+  limiterRequetes($bd, 'login', 12, 900);
   $login = trim($in['identifiant'] ?? $in['email'] ?? $in['nom'] ?? '');
   if ($login === '') err('Identifiant ou e-mail requis', 400);
   $mdp = $in['mot_de_passe'] ?? '';
@@ -143,8 +221,7 @@ if ($action === 'login') {
   $s = $bd->prepare('SELECT * FROM utilisateurs WHERE LOWER(email)=? OR LOWER(nom)=? LIMIT 1');
   $s->execute([strtolower($login), strtolower($login)]);
   $u = $s->fetch();
-  if (!$u || !password_verify($mdp, $u['mot_de_passe'])) err('Identifiant ou mot de passe incorrect', 401);
-  if (!$u['actif']) err('Compte désactivé', 403);
+  if (!$u || !password_verify($mdp, $u['mot_de_passe']) || !$u['actif']) err('Identifiant ou mot de passe incorrect', 401);
   if ($maintenanceActive && $u['role'] !== 'admin') err('Le site est en maintenance. Réessayez plus tard.', 503);
   if (password_needs_rehash($u['mot_de_passe'], PASSWORD_BCRYPT, ['cost' => 12])) {
     $bd->prepare('UPDATE utilisateurs SET mot_de_passe=? WHERE id=?')->execute([hacherMotDePasse($mdp), $u['id']]);
@@ -154,6 +231,7 @@ if ($action === 'login') {
   rep(['jeton' => ouvrirSession($bd, $u['id']), 'utilisateur' => pub($u)]);
 }
 if ($action === 'password_reset_request') {
+  limiterRequetes($bd, 'password_reset_request', 4, 3600);
   $expediteur = defined('MAIL_FROM_ADDRESS') ? MAIL_FROM_ADDRESS : '';
   if (!filter_var($expediteur, FILTER_VALIDATE_EMAIL)) {
     err('Envoi indisponible : ajoutez une adresse valide MAIL_FROM_ADDRESS dans api/config.local.php.', 503);
@@ -223,6 +301,7 @@ if ($action === 'password_reset_request') {
   rep(['ok' => true, 'message' => $message]);
 }
 if ($action === 'password_reset_confirm') {
+  limiterRequetes($bd, 'password_reset_confirm', 10, 900);
   $email = strtolower(trim($in['email'] ?? ''));
   $code = $in['code'] ?? '';
   $nouveau = $in['nouveau'] ?? '';
@@ -255,6 +334,7 @@ if ($action === 'password_reset_confirm') {
   rep(['ok' => true]);
 }
 if ($action === 'contact') {
+  limiterRequetes($bd, 'contact', 5, 3600);
   if ($maintenanceActive) err('Le site est en maintenance. Réessayez plus tard.', 503);
   $nom = trim($in['nom'] ?? ''); $email = strtolower(trim($in['email'] ?? ''));
   $sujet = trim($in['sujet'] ?? ''); $msg = trim($in['message'] ?? '');

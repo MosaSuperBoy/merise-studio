@@ -1,1 +1,6 @@
 api/config.local.php
+.env
+.env.*
+*.pem
+*.key
+*.zip

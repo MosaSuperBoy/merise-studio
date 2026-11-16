@@ -103,7 +103,8 @@
     if (requeteMouvementReduit && requeteMouvementReduit.matches) return;
     if (!('IntersectionObserver' in window)) return;
 
-    var cibles = document.querySelectorAll('.page > *');
+    // Anime les sections comme le tableau admin et décale aussi les cartes une par une.
+    var cibles = document.querySelectorAll('.page > *, .page .cartes article');
     if (!cibles.length) return;
 
     var observateur = new IntersectionObserver(function (entrees) {
@@ -115,7 +116,7 @@
     }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
 
     Array.prototype.forEach.call(cibles, function (cible, index) {
-      cible.style.setProperty('--ms-reveal-delay', Math.min(index % 4, 3) * 65 + 'ms');
+      cible.style.setProperty('--ms-reveal-delay', Math.min(index % 4, 3) * 110 + 'ms');
       cible.classList.add('ms-reveal');
       observateur.observe(cible);
     });

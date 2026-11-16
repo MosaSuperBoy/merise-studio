@@ -57,6 +57,14 @@ CREATE TABLE IF NOT EXISTS sessions (
   INDEX idx_sess_expire (expire_le)
 ) ENGINE=InnoDB;
 
+-- Compteurs anti-abus pour les routes publiques, indexés par action et adresse IP hachées.
+CREATE TABLE IF NOT EXISTS api_rate_limits (
+  bucket          CHAR(64)       NOT NULL PRIMARY KEY,
+  window_started  DATETIME       NOT NULL,
+  attempts        INT UNSIGNED   NOT NULL DEFAULT 1,
+  INDEX idx_rate_window (window_started)
+) ENGINE=InnoDB;
+
 -- Codes de réinitialisation de mot de passe (hachés, temporaires et à usage unique)
 CREATE TABLE IF NOT EXISTS password_reset_codes (
   utilisateur_id  INT UNSIGNED PRIMARY KEY,

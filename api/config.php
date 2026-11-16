@@ -17,7 +17,7 @@ if (is_file($configLocale)) {
   define('DB_NOM', 'merise_studio');
   define('DB_UTILISATEUR', 'root');
   define('DB_MOT_DE_PASSE', '');
-  define('SESSION_JOURS', 30);
+  define('SESSION_JOURS', 7);
 }
 // Valeur par défaut si un ancien config.local.php ne définit pas la durée des sessions
-if (!defined('SESSION_JOURS')) define('SESSION_JOURS', 30);
+if (!defined('SESSION_JOURS')) define('SESSION_JOURS', 7);
